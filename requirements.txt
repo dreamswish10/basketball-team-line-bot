@@ -1,0 +1,36 @@
+# Flask 核心框架
+Flask==2.3.3
+
+# LINE Bot SDK
+line-bot-sdk==3.5.0
+
+# 環境變數管理
+python-dotenv==1.0.0
+
+# WSGI 伺服器（生產環境）
+gunicorn==21.2.0
+
+# 資料庫相關（SQLite 已內建於 Python）
+# 如需要其他資料庫支援可解除註解：
+# SQLAlchemy==2.0.23
+# Flask-SQLAlchemy==3.1.1
+
+# 測試框架（開發時使用）
+pytest==7.4.3
+pytest-flask==1.3.0
+
+# 程式碼品質工具
+flake8==6.1.0
+black==23.11.0
+
+# 安全性
+cryptography==41.0.7
+
+# 日期時間處理
+python-dateutil==2.8.2
+
+# HTTP 請求處理
+requests==2.31.0
+
+# JSON 處理增強
+ujson==5.8.0
