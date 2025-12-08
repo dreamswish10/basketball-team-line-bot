@@ -10,60 +10,22 @@ from linebot.models import (
     PostbackAction, URIAction, PostbackEvent
 )
 
-# 處理不同版本的 SpacerComponent 導入
+# 處理不同版本的 SpacerComponent 導入 - 使用安全的方式
+SPACER_AVAILABLE = False
 try:
     from linebot.models import SpacerComponent
+    SPACER_AVAILABLE = True
 except ImportError:
     try:
         from linebot.models.flex_message import SpacerComponent
+        SPACER_AVAILABLE = True
     except ImportError:
         try:
             from linebot.models import Spacer as SpacerComponent
+            SPACER_AVAILABLE = True
         except ImportError:
-            # 如果都無法導入，創建一個完全相容的替代類
-            class SpacerComponent:
-                def __init__(self, size="md", margin=None):
-                    self.size = size
-                    self.margin = margin
-                    self._type = "spacer"
-                    
-                def as_json_dict(self):
-                    """返回符合 LINE Bot SDK 格式的字典"""
-                    result = {
-                        "type": "spacer"
-                    }
-                    
-                    # 只有在 size 不是預設值時才加入
-                    if self.size and self.size != "md":
-                        result["size"] = self.size
-                    elif self.size:
-                        result["size"] = self.size
-                    
-                    # 只有當 margin 有值時才加入
-                    if self.margin:
-                        result["margin"] = self.margin
-                    
-                    return result
-                    
-                @property
-                def type(self):
-                    return self._type
-                
-                # 為了與 LINE Bot SDK 完全相容，添加額外的方法
-                def __dict__(self):
-                    return self.as_json_dict()
-                
-                def __repr__(self):
-                    return f"SpacerComponent(size='{self.size}', margin={self.margin})"
-                
-                # 確保物件可以被正確序列化
-                def __getstate__(self):
-                    return self.as_json_dict()
-                
-                def __setstate__(self, state):
-                    self.size = state.get('size', 'md')
-                    self.margin = state.get('margin')
-                    self._type = 'spacer'
+            # SpacerComponent 不可用，我們將使用替代方案
+            SpacerComponent = None
 from models import Player, PlayerDatabase
 from team_algorithm import TeamGenerator
 
@@ -71,6 +33,34 @@ class LineMessageHandler:
     def __init__(self, line_bot_api):
         self.line_bot_api = line_bot_api
         self.team_generator = TeamGenerator()
+    
+    def _create_spacer(self, size="md", margin=None):
+        """創建間距組件 - 安全的 SpacerComponent 替代方案"""
+        if SPACER_AVAILABLE and SpacerComponent:
+            # 如果 SpacerComponent 可用，使用它
+            if margin:
+                return SpacerComponent(size=size, margin=margin)
+            else:
+                return SpacerComponent(size=size)
+        else:
+            # 使用 TextComponent 作為替代間距方案
+            size_map = {
+                "xs": "xxs",
+                "sm": "xs", 
+                "md": "sm",
+                "lg": "md",
+                "xl": "lg",
+                "xxl": "xl"
+            }
+            text_size = size_map.get(size, "sm")
+            
+            spacer_text = TextComponent(
+                text=" ",  # 空白字符作為間距
+                size=text_size,
+                color="#FFFFFF00",  # 透明色
+                margin=margin
+            )
+            return spacer_text
     
     def handle_text_message(self, event):
         """處理文字訊息"""
@@ -331,7 +321,7 @@ class LineMessageHandler:
                         color="#FF6B35"
                     ),
                     SeparatorComponent(margin="md"),
-                    SpacerComponent(size="sm"),
+                    self._create_spacer(size="sm"),
                     TextComponent(
                         text="歡迎使用智能籃球分隊系統！",
                         size="md",
@@ -339,7 +329,7 @@ class LineMessageHandler:
                         wrap=True,
                         color="#333333"
                     ),
-                    SpacerComponent(size="md"),
+                    self._create_spacer(size="md"),
                     BoxComponent(
                         layout="vertical",
                         contents=[
@@ -416,7 +406,7 @@ class LineMessageHandler:
                         color="#28A745"
                     ),
                     SeparatorComponent(margin="md"),
-                    SpacerComponent(size="md"),
+                    self._create_spacer(size="md"),
                     BoxComponent(
                         layout="vertical",
                         contents=[
@@ -427,13 +417,13 @@ class LineMessageHandler:
                                 align="center",
                                 color="#333333"
                             ),
-                            SpacerComponent(size="md"),
+                            self._create_spacer(size="md"),
                             self._create_skill_bar("🎯 投籃", player.shooting_skill),
-                            SpacerComponent(size="sm"),
+                            self._create_spacer(size="sm"),
                             self._create_skill_bar("🛡️ 防守", player.defense_skill),
-                            SpacerComponent(size="sm"),
+                            self._create_spacer(size="sm"),
                             self._create_skill_bar("💪 體力", player.stamina),
-                            SpacerComponent(size="md"),
+                            self._create_spacer(size="md"),
                             BoxComponent(
                                 layout="baseline",
                                 contents=[
@@ -499,7 +489,7 @@ class LineMessageHandler:
                     color="#666666",
                     flex=0
                 ),
-                SpacerComponent(size="sm"),
+                self._create_spacer(size="sm"),
                 TextComponent(
                     text=skill_bar,
                     size="xs",
@@ -531,13 +521,13 @@ class LineMessageHandler:
                             color="#4A90E2"
                         ),
                         SeparatorComponent(margin="md"),
-                        SpacerComponent(size="md"),
+                        self._create_spacer(size="md"),
                         TextComponent(
                             text="目前沒有註冊的球員",
                             align="center",
                             color="#666666"
                         ),
-                        SpacerComponent(size="md"),
+                        self._create_spacer(size="md"),
                         TextComponent(
                             text="快來註冊第一位球員吧！",
                             align="center",
@@ -574,9 +564,9 @@ class LineMessageHandler:
                             size="md",
                             color="#333333"
                         ),
-                        SpacerComponent(size="sm"),
+                        self._create_spacer(size="sm"),
                         self._create_mini_skill_display(player),
-                        SpacerComponent(size="sm"),
+                        self._create_spacer(size="sm"),
                         BoxComponent(
                             layout="baseline",
                             contents=[
@@ -611,19 +601,19 @@ class LineMessageHandler:
                         color="#4A90E2"
                     ),
                     SeparatorComponent(margin="sm"),
-                    SpacerComponent(size="sm"),
+                    self._create_spacer(size="sm"),
                     TextComponent(
                         text=f"總球員數：{len(players)} 人",
                         size="sm",
                         color="#333333"
                     ),
-                    SpacerComponent(size="xs"),
+                    self._create_spacer(size="xs"),
                     TextComponent(
                         text=f"平均評分：{sum(p.overall_rating for p in players)/len(players):.1f}",
                         size="sm",
                         color="#666666"
                     ),
-                    SpacerComponent(size="sm"),
+                    self._create_spacer(size="sm"),
                     *self._create_team_suggestions(len(players))
                 ]
             ),
@@ -711,7 +701,7 @@ class LineMessageHandler:
                             align="center",
                             color="#DC3545"
                         ),
-                        SpacerComponent(size="md"),
+                        self._create_spacer(size="md"),
                         TextComponent(
                             text="目前沒有足夠的球員進行分隊",
                             align="center",
@@ -750,9 +740,9 @@ class LineMessageHandler:
                             margin="sm"
                         ),
                         SeparatorComponent(margin="md"),
-                        SpacerComponent(size="sm"),
+                        self._create_spacer(size="sm"),
                         *self._create_team_players_list(team),
-                        SpacerComponent(size="md"),
+                        self._create_spacer(size="md"),
                         self._create_team_stats_display(stat, color)
                     ]
                 )
@@ -776,7 +766,7 @@ class LineMessageHandler:
                             color="#6F42C1"
                         ),
                         SeparatorComponent(margin="md"),
-                        SpacerComponent(size="md"),
+                        self._create_spacer(size="md"),
                         BoxComponent(
                             layout="baseline",
                             contents=[
@@ -795,7 +785,7 @@ class LineMessageHandler:
                                 )
                             ]
                         ),
-                        SpacerComponent(size="sm"),
+                        self._create_spacer(size="sm"),
                         TextComponent(
                             text=self._get_balance_comment(balance_score),
                             size="sm",
@@ -803,7 +793,7 @@ class LineMessageHandler:
                             align="center",
                             color="#666666"
                         ),
-                        SpacerComponent(size="md"),
+                        self._create_spacer(size="md"),
                         TextComponent(
                             text=f"總共 {sum(len(team) for team in teams)} 位球員",
                             size="xs",
@@ -846,7 +836,7 @@ class LineMessageHandler:
                             color="#666666",
                             flex=0
                         ),
-                        SpacerComponent(size="sm"),
+                        self._create_spacer(size="sm"),
                         TextComponent(
                             text=player.name,
                             size="sm",
@@ -878,7 +868,7 @@ class LineMessageHandler:
                     size="sm",
                     color=color
                 ),
-                SpacerComponent(size="xs"),
+                self._create_spacer(size="xs"),
                 BoxComponent(
                     layout="horizontal",
                     contents=[
@@ -939,7 +929,7 @@ class LineMessageHandler:
                         color="#4A90E2"
                     ),
                     SeparatorComponent(margin="md"),
-                    SpacerComponent(size="md"),
+                    self._create_spacer(size="md"),
                     TextComponent(
                         text=player.name,
                         weight="bold",
@@ -947,7 +937,7 @@ class LineMessageHandler:
                         align="center",
                         color="#333333"
                     ),
-                    SpacerComponent(size="lg"),
+                    self._create_spacer(size="lg"),
                     BoxComponent(
                         layout="vertical",
                         contents=[
@@ -958,15 +948,15 @@ class LineMessageHandler:
                                 color="#FF6B35",
                                 margin="none"
                             ),
-                            SpacerComponent(size="md"),
+                            self._create_spacer(size="md"),
                             self._create_skill_bar("🎯 投籃", player.shooting_skill),
-                            SpacerComponent(size="sm"),
+                            self._create_spacer(size="sm"),
                             self._create_skill_bar("🛡️ 防守", player.defense_skill),
-                            SpacerComponent(size="sm"),
+                            self._create_spacer(size="sm"),
                             self._create_skill_bar("💪 體力", player.stamina),
-                            SpacerComponent(size="md"),
+                            self._create_spacer(size="md"),
                             SeparatorComponent(),
-                            SpacerComponent(size="md"),
+                            self._create_spacer(size="md"),
                             BoxComponent(
                                 layout="baseline",
                                 contents=[
@@ -985,7 +975,7 @@ class LineMessageHandler:
                                     )
                                 ]
                             ),
-                            SpacerComponent(size="md"),
+                            self._create_spacer(size="md"),
                             BoxComponent(
                                 layout="baseline",
                                 contents=[
