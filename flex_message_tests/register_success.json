@@ -1,0 +1,174 @@
+{
+  "type": "bubble",
+  "body": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "✅ 註冊成功！",
+        "size": "xl",
+        "align": "center",
+        "weight": "bold",
+        "color": "#28A745"
+      },
+      {
+        "type": "separator",
+        "margin": "md"
+      },
+      null,
+      {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "👤 小明",
+            "size": "lg",
+            "align": "center",
+            "weight": "bold",
+            "color": "#333333"
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "🎯 投籃",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              null,
+              {
+                "type": "text",
+                "text": "████████░░",
+                "flex": 0,
+                "size": "xs",
+                "color": "#FF6B35"
+              },
+              {
+                "type": "text",
+                "text": "8",
+                "size": "sm",
+                "align": "end",
+                "weight": "bold",
+                "color": "#333333"
+              }
+            ]
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "🛡️ 防守",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              null,
+              {
+                "type": "text",
+                "text": "███████░░░",
+                "flex": 0,
+                "size": "xs",
+                "color": "#FF6B35"
+              },
+              {
+                "type": "text",
+                "text": "7",
+                "size": "sm",
+                "align": "end",
+                "weight": "bold",
+                "color": "#333333"
+              }
+            ]
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "💪 體力",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              null,
+              {
+                "type": "text",
+                "text": "█████████░",
+                "flex": 0,
+                "size": "xs",
+                "color": "#FF6B35"
+              },
+              {
+                "type": "text",
+                "text": "9",
+                "size": "sm",
+                "align": "end",
+                "weight": "bold",
+                "color": "#333333"
+              }
+            ]
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "⭐ 總體評分：",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "8.0/10",
+                "size": "md",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "type": "box",
+    "layout": "vertical",
+    "spacing": "sm",
+    "contents": [
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "📋 查看所有球員",
+          "data": "action=list_players"
+        },
+        "style": "primary",
+        "color": "#4A90E2"
+      },
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "🏀 開始分隊",
+          "data": "action=team_help"
+        },
+        "style": "secondary"
+      }
+    ]
+  }
+}

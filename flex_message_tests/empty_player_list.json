@@ -1,0 +1,52 @@
+{
+  "type": "bubble",
+  "body": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "📋 球員列表",
+        "size": "xl",
+        "align": "center",
+        "weight": "bold",
+        "color": "#4A90E2"
+      },
+      {
+        "type": "separator",
+        "margin": "md"
+      },
+      null,
+      {
+        "type": "text",
+        "text": "目前沒有註冊的球員",
+        "align": "center",
+        "color": "#666666"
+      },
+      null,
+      {
+        "type": "text",
+        "text": "快來註冊第一位球員吧！",
+        "size": "sm",
+        "align": "center",
+        "color": "#999999"
+      }
+    ]
+  },
+  "footer": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "📝 註冊球員",
+          "data": "action=register_help"
+        },
+        "style": "primary",
+        "color": "#FF6B35"
+      }
+    ]
+  }
+}

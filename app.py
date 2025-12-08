@@ -4,7 +4,7 @@
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, PostbackEvent
 import os
 from config import Config
 from models import init_db, Player
@@ -47,6 +47,10 @@ def callback():
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     message_handler.handle_text_message(event)
+
+@handler.add(PostbackEvent)
+def handle_postback(event):
+    message_handler.handle_postback_event(event)
 
 @app.route("/health")
 def health_check():

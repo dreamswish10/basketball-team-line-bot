@@ -1,0 +1,686 @@
+{
+  "type": "carousel",
+  "contents": [
+    {
+      "type": "bubble",
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "👤 Kobe Bryant",
+            "size": "md",
+            "weight": "bold",
+            "color": "#333333"
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "🎯",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "10",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#FF6B35"
+                  }
+                ]
+              },
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "🛡️",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "8",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#4A90E2"
+                  }
+                ]
+              },
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "💪",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "7",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#28A745"
+                  }
+                ]
+              }
+            ]
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "總評：",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "8.3/10",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "bubble",
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "👤 LeBron James",
+            "size": "md",
+            "weight": "bold",
+            "color": "#333333"
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "🎯",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "9",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#FF6B35"
+                  }
+                ]
+              },
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "🛡️",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "9",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#4A90E2"
+                  }
+                ]
+              },
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "💪",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "9",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#28A745"
+                  }
+                ]
+              }
+            ]
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "總評：",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "9.0/10",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "bubble",
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "👤 Stephen Curry",
+            "size": "md",
+            "weight": "bold",
+            "color": "#333333"
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "🎯",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "10",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#FF6B35"
+                  }
+                ]
+              },
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "🛡️",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "6",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#4A90E2"
+                  }
+                ]
+              },
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "💪",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "8",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#28A745"
+                  }
+                ]
+              }
+            ]
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "總評：",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "8.0/10",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "bubble",
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "👤 Kevin Durant",
+            "size": "md",
+            "weight": "bold",
+            "color": "#333333"
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "🎯",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "10",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#FF6B35"
+                  }
+                ]
+              },
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "🛡️",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "7",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#4A90E2"
+                  }
+                ]
+              },
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "💪",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "8",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#28A745"
+                  }
+                ]
+              }
+            ]
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "總評：",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "8.3/10",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "bubble",
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "👤 Giannis",
+            "size": "md",
+            "weight": "bold",
+            "color": "#333333"
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "🎯",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "7",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#FF6B35"
+                  }
+                ]
+              },
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "🛡️",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "9",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#4A90E2"
+                  }
+                ]
+              },
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "💪",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "10",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#28A745"
+                  }
+                ]
+              }
+            ]
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "總評：",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "8.7/10",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "bubble",
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "👤 Chris Paul",
+            "size": "md",
+            "weight": "bold",
+            "color": "#333333"
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "🎯",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "7",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#FF6B35"
+                  }
+                ]
+              },
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "🛡️",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "8",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#4A90E2"
+                  }
+                ]
+              },
+              {
+                "type": "box",
+                "layout": "vertical",
+                "flex": 1,
+                "contents": [
+                  {
+                    "type": "text",
+                    "text": "💪",
+                    "size": "xs",
+                    "align": "center"
+                  },
+                  {
+                    "type": "text",
+                    "text": "9",
+                    "size": "xs",
+                    "align": "center",
+                    "color": "#28A745"
+                  }
+                ]
+              }
+            ]
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "總評：",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "8.0/10",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "bubble",
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "📊 統計資訊",
+            "size": "md",
+            "weight": "bold",
+            "color": "#4A90E2"
+          },
+          {
+            "type": "separator",
+            "margin": "sm"
+          },
+          null,
+          {
+            "type": "text",
+            "text": "總球員數：6 人",
+            "size": "sm",
+            "color": "#333333"
+          },
+          null,
+          {
+            "type": "text",
+            "text": "平均評分：8.4",
+            "size": "sm",
+            "color": "#666666"
+          },
+          null,
+          {
+            "type": "text",
+            "text": "• 2隊 (每隊約3人) - 3v3 半場",
+            "size": "xs",
+            "color": "#666666"
+          }
+        ]
+      },
+      "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "button",
+            "action": {
+              "type": "postback",
+              "label": "🏀 開始分隊",
+              "data": "action=team_help"
+            },
+            "style": "primary",
+            "color": "#4A90E2"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,208 @@
+{
+  "type": "bubble",
+  "body": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "👤 個人資料",
+        "size": "xl",
+        "align": "center",
+        "weight": "bold",
+        "color": "#4A90E2"
+      },
+      {
+        "type": "separator",
+        "margin": "md"
+      },
+      null,
+      {
+        "type": "text",
+        "text": "Stephen Curry",
+        "size": "lg",
+        "align": "center",
+        "weight": "bold",
+        "color": "#333333"
+      },
+      null,
+      {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "🏀 技能評估",
+            "margin": "none",
+            "size": "md",
+            "weight": "bold",
+            "color": "#FF6B35"
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "🎯 投籃",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              null,
+              {
+                "type": "text",
+                "text": "██████████",
+                "flex": 0,
+                "size": "xs",
+                "color": "#FF6B35"
+              },
+              {
+                "type": "text",
+                "text": "10",
+                "size": "sm",
+                "align": "end",
+                "weight": "bold",
+                "color": "#333333"
+              }
+            ]
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "🛡️ 防守",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              null,
+              {
+                "type": "text",
+                "text": "██████░░░░",
+                "flex": 0,
+                "size": "xs",
+                "color": "#FF6B35"
+              },
+              {
+                "type": "text",
+                "text": "6",
+                "size": "sm",
+                "align": "end",
+                "weight": "bold",
+                "color": "#333333"
+              }
+            ]
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "💪 體力",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              null,
+              {
+                "type": "text",
+                "text": "████████░░",
+                "flex": 0,
+                "size": "xs",
+                "color": "#FF6B35"
+              },
+              {
+                "type": "text",
+                "text": "8",
+                "size": "sm",
+                "align": "end",
+                "weight": "bold",
+                "color": "#333333"
+              }
+            ]
+          },
+          null,
+          {
+            "type": "separator"
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "⭐ 總體評分",
+                "flex": 0,
+                "weight": "bold",
+                "color": "#333333"
+              },
+              {
+                "type": "text",
+                "text": "8.0/10",
+                "size": "lg",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "📅 註冊時間",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "2023-12-08",
+                "size": "sm",
+                "align": "end",
+                "color": "#666666"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "type": "box",
+    "layout": "vertical",
+    "spacing": "sm",
+    "contents": [
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "📋 查看所有球員",
+          "data": "action=list_players"
+        },
+        "style": "secondary"
+      },
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "🏀 開始分隊",
+          "data": "action=team_help"
+        },
+        "style": "primary",
+        "color": "#4A90E2"
+      }
+    ]
+  }
+}

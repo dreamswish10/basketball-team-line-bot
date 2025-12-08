@@ -1,0 +1,98 @@
+{
+  "type": "bubble",
+  "direction": "ltr",
+  "body": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "🏀 籃球分隊機器人",
+        "size": "xl",
+        "align": "center",
+        "weight": "bold",
+        "color": "#FF6B35"
+      },
+      {
+        "type": "separator",
+        "margin": "md"
+      },
+      null,
+      {
+        "type": "text",
+        "text": "歡迎使用智能籃球分隊系統！",
+        "size": "md",
+        "align": "center",
+        "wrap": true,
+        "color": "#333333"
+      },
+      null,
+      {
+        "type": "box",
+        "layout": "vertical",
+        "margin": "md",
+        "contents": [
+          {
+            "type": "text",
+            "text": "✨ 主要功能",
+            "size": "md",
+            "weight": "bold",
+            "color": "#4A90E2"
+          },
+          {
+            "type": "text",
+            "text": "• 球員註冊與管理\n• 技能評估系統\n• 智能平衡分隊\n• 多種分隊模式",
+            "margin": "sm",
+            "size": "sm",
+            "wrap": true,
+            "color": "#666666"
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "type": "box",
+    "layout": "vertical",
+    "spacing": "sm",
+    "contents": [
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "📝 註冊球員",
+          "data": "action=register_help"
+        },
+        "style": "primary",
+        "color": "#FF6B35"
+      },
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "📋 球員列表",
+          "data": "action=list_players"
+        },
+        "style": "secondary"
+      },
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "🏀 開始分隊",
+          "data": "action=team_help"
+        },
+        "style": "secondary"
+      },
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "❓ 使用說明",
+          "data": "action=help"
+        },
+        "style": "link"
+      }
+    ]
+  }
+}

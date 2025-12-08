@@ -1,0 +1,488 @@
+{
+  "type": "carousel",
+  "contents": [
+    {
+      "type": "bubble",
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "🔥 第 1 隊",
+            "size": "lg",
+            "align": "center",
+            "weight": "bold",
+            "color": "#FF6B35"
+          },
+          {
+            "type": "text",
+            "text": "平均評分：8.4",
+            "margin": "sm",
+            "size": "sm",
+            "align": "center",
+            "color": "#666666"
+          },
+          {
+            "type": "separator",
+            "margin": "md"
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "margin": "xs",
+            "contents": [
+              {
+                "type": "text",
+                "text": "1.",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              null,
+              {
+                "type": "text",
+                "text": "LeBron James",
+                "flex": 1,
+                "size": "sm",
+                "color": "#333333"
+              },
+              {
+                "type": "text",
+                "text": "9.0",
+                "flex": 0,
+                "size": "sm",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          },
+          {
+            "type": "box",
+            "layout": "baseline",
+            "margin": "xs",
+            "contents": [
+              {
+                "type": "text",
+                "text": "2.",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              null,
+              {
+                "type": "text",
+                "text": "Kobe Bryant",
+                "flex": 1,
+                "size": "sm",
+                "color": "#333333"
+              },
+              {
+                "type": "text",
+                "text": "8.3",
+                "flex": 0,
+                "size": "sm",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          },
+          {
+            "type": "box",
+            "layout": "baseline",
+            "margin": "xs",
+            "contents": [
+              {
+                "type": "text",
+                "text": "3.",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              null,
+              {
+                "type": "text",
+                "text": "Chris Paul",
+                "flex": 1,
+                "size": "sm",
+                "color": "#333333"
+              },
+              {
+                "type": "text",
+                "text": "8.0",
+                "flex": 0,
+                "size": "sm",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+              {
+                "type": "text",
+                "text": "📊 技能統計",
+                "size": "sm",
+                "weight": "bold",
+                "color": "#FF6B35"
+              },
+              null,
+              {
+                "type": "box",
+                "layout": "horizontal",
+                "contents": [
+                  {
+                    "type": "box",
+                    "layout": "vertical",
+                    "flex": 1,
+                    "contents": [
+                      {
+                        "type": "text",
+                        "text": "🎯",
+                        "size": "xs",
+                        "align": "center"
+                      },
+                      {
+                        "type": "text",
+                        "text": "8.7",
+                        "size": "xs",
+                        "align": "center",
+                        "color": "#FF6B35"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "box",
+                    "layout": "vertical",
+                    "flex": 1,
+                    "contents": [
+                      {
+                        "type": "text",
+                        "text": "🛡️",
+                        "size": "xs",
+                        "align": "center"
+                      },
+                      {
+                        "type": "text",
+                        "text": "8.3",
+                        "size": "xs",
+                        "align": "center",
+                        "color": "#4A90E2"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "box",
+                    "layout": "vertical",
+                    "flex": 1,
+                    "contents": [
+                      {
+                        "type": "text",
+                        "text": "💪",
+                        "size": "xs",
+                        "align": "center"
+                      },
+                      {
+                        "type": "text",
+                        "text": "8.3",
+                        "size": "xs",
+                        "align": "center",
+                        "color": "#28A745"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "bubble",
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "🔥 第 2 隊",
+            "size": "lg",
+            "align": "center",
+            "weight": "bold",
+            "color": "#4A90E2"
+          },
+          {
+            "type": "text",
+            "text": "平均評分：8.3",
+            "margin": "sm",
+            "size": "sm",
+            "align": "center",
+            "color": "#666666"
+          },
+          {
+            "type": "separator",
+            "margin": "md"
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "margin": "xs",
+            "contents": [
+              {
+                "type": "text",
+                "text": "1.",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              null,
+              {
+                "type": "text",
+                "text": "Giannis",
+                "flex": 1,
+                "size": "sm",
+                "color": "#333333"
+              },
+              {
+                "type": "text",
+                "text": "8.7",
+                "flex": 0,
+                "size": "sm",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          },
+          {
+            "type": "box",
+            "layout": "baseline",
+            "margin": "xs",
+            "contents": [
+              {
+                "type": "text",
+                "text": "2.",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              null,
+              {
+                "type": "text",
+                "text": "Kevin Durant",
+                "flex": 1,
+                "size": "sm",
+                "color": "#333333"
+              },
+              {
+                "type": "text",
+                "text": "8.3",
+                "flex": 0,
+                "size": "sm",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          },
+          {
+            "type": "box",
+            "layout": "baseline",
+            "margin": "xs",
+            "contents": [
+              {
+                "type": "text",
+                "text": "3.",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              null,
+              {
+                "type": "text",
+                "text": "Stephen Curry",
+                "flex": 1,
+                "size": "sm",
+                "color": "#333333"
+              },
+              {
+                "type": "text",
+                "text": "8.0",
+                "flex": 0,
+                "size": "sm",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+              {
+                "type": "text",
+                "text": "📊 技能統計",
+                "size": "sm",
+                "weight": "bold",
+                "color": "#4A90E2"
+              },
+              null,
+              {
+                "type": "box",
+                "layout": "horizontal",
+                "contents": [
+                  {
+                    "type": "box",
+                    "layout": "vertical",
+                    "flex": 1,
+                    "contents": [
+                      {
+                        "type": "text",
+                        "text": "🎯",
+                        "size": "xs",
+                        "align": "center"
+                      },
+                      {
+                        "type": "text",
+                        "text": "9.0",
+                        "size": "xs",
+                        "align": "center",
+                        "color": "#FF6B35"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "box",
+                    "layout": "vertical",
+                    "flex": 1,
+                    "contents": [
+                      {
+                        "type": "text",
+                        "text": "🛡️",
+                        "size": "xs",
+                        "align": "center"
+                      },
+                      {
+                        "type": "text",
+                        "text": "7.3",
+                        "size": "xs",
+                        "align": "center",
+                        "color": "#4A90E2"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "box",
+                    "layout": "vertical",
+                    "flex": 1,
+                    "contents": [
+                      {
+                        "type": "text",
+                        "text": "💪",
+                        "size": "xs",
+                        "align": "center"
+                      },
+                      {
+                        "type": "text",
+                        "text": "8.7",
+                        "size": "xs",
+                        "align": "center",
+                        "color": "#28A745"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "bubble",
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "⚖️ 分隊總結",
+            "size": "lg",
+            "align": "center",
+            "weight": "bold",
+            "color": "#6F42C1"
+          },
+          {
+            "type": "separator",
+            "margin": "md"
+          },
+          null,
+          {
+            "type": "box",
+            "layout": "baseline",
+            "contents": [
+              {
+                "type": "text",
+                "text": "隊伍平衡度：",
+                "flex": 0,
+                "size": "sm",
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "9.9/10",
+                "size": "md",
+                "align": "end",
+                "weight": "bold",
+                "color": "#FF6B35"
+              }
+            ]
+          },
+          null,
+          {
+            "type": "text",
+            "text": "🌟 完美平衡！隊伍實力非常均等",
+            "size": "sm",
+            "align": "center",
+            "wrap": true,
+            "color": "#666666"
+          },
+          null,
+          {
+            "type": "text",
+            "text": "總共 6 位球員",
+            "size": "xs",
+            "align": "center",
+            "color": "#999999"
+          }
+        ]
+      },
+      "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "button",
+            "action": {
+              "type": "postback",
+              "label": "🔄 重新分隊",
+              "data": "action=team_help"
+            },
+            "style": "secondary"
+          }
+        ]
+      }
+    }
+  ]
+}
