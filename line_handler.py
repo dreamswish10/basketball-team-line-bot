@@ -26,13 +26,15 @@ except ImportError:
         except ImportError:
             # SpacerComponent 不可用，我們將使用替代方案
             SpacerComponent = None
-from models import Player, PlayerDatabase
+from models import Player, PlayerDatabase, GroupDatabase
 from team_algorithm import TeamGenerator
+from group_manager import GroupManager
 
 class LineMessageHandler:
     def __init__(self, line_bot_api):
         self.line_bot_api = line_bot_api
         self.team_generator = TeamGenerator()
+        self.group_manager = GroupManager(line_bot_api)
     
     def _create_spacer(self, size="md", margin=None):
         """創建間距組件 - 安全的 SpacerComponent 替代方案"""
@@ -68,9 +70,33 @@ class LineMessageHandler:
         message_text = event.message.text.strip()
         
         try:
+            # 檢查是否為群組訊息
+            is_group = hasattr(event.source, 'group_id')
+            group_id = getattr(event.source, 'group_id', None)
+            
             # 根據指令路由到不同的處理函數
-            if message_text.startswith('/register') or message_text.startswith('註冊'):
-                self._handle_register_command(event, message_text)
+            if message_text.startswith('/group_team') or message_text.startswith('群組分隊'):
+                if is_group:
+                    self._handle_group_team_command(event, message_text, group_id)
+                else:
+                    self._send_message(event.reply_token, "❌ 此指令只能在群組中使用")
+            elif message_text.startswith('/group_players') or message_text.startswith('群組成員'):
+                if is_group:
+                    self._handle_group_players_command(event, group_id)
+                else:
+                    self._send_message(event.reply_token, "❌ 此指令只能在群組中使用")
+            elif message_text.startswith('/group_stats') or message_text.startswith('群組統計'):
+                if is_group:
+                    self._handle_group_stats_command(event, group_id)
+                else:
+                    self._send_message(event.reply_token, "❌ 此指令只能在群組中使用")
+            elif message_text.startswith('/sync') or message_text.startswith('同步成員'):
+                if is_group:
+                    self._handle_sync_command(event, group_id)
+                else:
+                    self._send_message(event.reply_token, "❌ 此指令只能在群組中使用")
+            elif message_text.startswith('/register') or message_text.startswith('註冊'):
+                self._handle_register_command(event, message_text, group_id)
             elif message_text.startswith('/list') or message_text == '球員列表':
                 self._handle_list_command(event)
             elif message_text.startswith('/team') or message_text.startswith('分隊'):
@@ -80,11 +106,11 @@ class LineMessageHandler:
             elif message_text.startswith('/delete') or message_text == '刪除資料':
                 self._handle_delete_command(event, user_id)
             elif message_text.startswith('/help') or message_text == '幫助' or message_text == '說明':
-                self._handle_help_command(event)
+                self._handle_help_command(event, is_group)
             elif message_text == '開始':
                 self._handle_start_command(event)
             else:
-                self._handle_unknown_command(event)
+                self._handle_unknown_command(event, is_group)
                 
         except Exception as e:
             print(f"Error handling message: {e}")
@@ -119,6 +145,20 @@ class LineMessageHandler:
                 self._handle_help_command(event)
             elif data == "action=profile":
                 self._handle_profile_command(event, user_id)
+            elif data.startswith("action=group_team"):
+                # 解析群組 ID
+                if "&group_id=" in data:
+                    group_id = data.split("&group_id=")[1]
+                    self._handle_group_team_command(event, "/group_team", group_id)
+                else:
+                    self._send_message(event.reply_token, "❌ 無法識別群組資訊")
+            elif data.startswith("action=group_reteam"):
+                # 重新分隊
+                if "&group_id=" in data:
+                    group_id = data.split("&group_id=")[1]
+                    self._handle_group_team_command(event, "/group_team", group_id)
+                else:
+                    self._send_message(event.reply_token, "❌ 無法識別群組資訊")
             else:
                 self._send_message(event.reply_token, "❓ 未知的操作")
                 
@@ -126,7 +166,7 @@ class LineMessageHandler:
             print(f"Error handling postback: {e}")
             self._send_message(event.reply_token, "❌ 系統發生錯誤，請稍後再試")
     
-    def _handle_register_command(self, event, message_text):
+    def _handle_register_command(self, event, message_text, group_id=None):
         """處理球員註冊指令"""
         user_id = event.source.user_id
         
@@ -160,7 +200,8 @@ class LineMessageHandler:
                     return
                 
                 # 創建球員
-                player = Player(user_id, name, shooting, defense, stamina)
+                player = Player(user_id, name, shooting, defense, stamina, 
+                              source_group=group_id, is_registered=True)
                 
                 if PlayerDatabase.create_player(player):
                     register_flex = self._create_register_success_flex(player)
@@ -247,10 +288,22 @@ class LineMessageHandler:
         
         self._send_message(event.reply_token, message)
     
-    def _handle_help_command(self, event):
+    def _handle_help_command(self, event, is_group=False):
         """處理幫助指令"""
         message = "🏀 籃球分隊機器人使用說明\n\n"
-        message += "📝 基本指令：\n"
+        
+        if is_group:
+            message += "📱 群組專用指令：\n"
+            message += "🔸 /group_team [隊數]\n"
+            message += "   使用群組成員自動分隊\n"
+            message += "🔸 /group_players\n"
+            message += "   查看群組成員清單\n"
+            message += "🔸 /group_stats\n"
+            message += "   群組統計資訊\n"
+            message += "🔸 /sync\n"
+            message += "   手動同步群組成員\n\n"
+        
+        message += "📝 個人指令：\n"
         message += "🔸 /register 姓名 投籃 防守 體力\n"
         message += "   註冊球員 (技能值 1-10)\n"
         message += "🔸 /list\n"
@@ -262,12 +315,13 @@ class LineMessageHandler:
         message += "🔸 /delete\n"
         message += "   刪除個人資料\n\n"
         message += "📖 使用範例：\n"
+        if is_group:
+            message += "• /group_team 2 (群組快速分隊)\n"
         message += "• /register 小明 8 7 9\n"
-        message += "• /team 3\n"
-        message += "• 分隊 2\n\n"
+        message += "• /team 3\n\n"
         message += "⚠️ 注意事項：\n"
         message += "• 技能值範圍：1-10\n"
-        message += "• 至少需要 2 位球員才能分隊\n"
+        message += "• 群組分隊會使用預設技能值\n"
         message += "• 系統會自動平衡隊伍實力"
         
         self._send_message(event.reply_token, message)
@@ -277,16 +331,154 @@ class LineMessageHandler:
         welcome_flex = self._create_welcome_flex()
         self._send_flex_message(event.reply_token, "籃球分隊機器人", welcome_flex)
     
-    def _handle_unknown_command(self, event):
+    def _handle_unknown_command(self, event, is_group=False):
         """處理未知指令"""
         message = "❓ 不認識的指令\n\n"
         message += "請使用以下指令：\n"
         message += "🔸 /help - 查看使用說明\n"
+        if is_group:
+            message += "🔸 /group_team - 群組快速分隊\n"
+            message += "🔸 /group_players - 群組成員清單\n"
         message += "🔸 /register - 註冊球員\n"
         message += "🔸 /list - 球員列表\n"
         message += "🔸 /team - 開始分隊"
         
         self._send_message(event.reply_token, message)
+    
+    # === 群組專用指令處理函數 ===
+    
+    def _handle_group_team_command(self, event, message_text, group_id):
+        """處理群組分隊指令"""
+        try:
+            # 解析隊伍數量
+            num_teams = 2  # 預設 2 隊
+            
+            patterns = [
+                r'/group_team\s+(\d+)',  # /group_team 3
+                r'群組分隊\s+(\d+)',      # 群組分隊 3
+            ]
+            
+            for pattern in patterns:
+                match = re.match(pattern, message_text)
+                if match:
+                    try:
+                        num_teams = int(match.group(1))
+                    except ValueError:
+                        pass
+                    break
+            
+            # 自動設定群組分隊
+            players = self.group_manager.auto_setup_group_team(group_id)
+            
+            if len(players) < 2:
+                self._send_message(event.reply_token, 
+                    "❌ 群組成員不足，至少需要 2 位成員才能分隊\n\n"
+                    "請確認：\n"
+                    "1. 群組有足夠的成員\n"
+                    "2. 機器人有讀取群組成員的權限")
+                return
+            
+            # 驗證隊伍數量
+            if num_teams < 2:
+                self._send_message(event.reply_token, "❌ 至少需要分成 2 隊")
+                return
+            
+            if num_teams > len(players):
+                self._send_message(event.reply_token, 
+                    f"❌ 隊伍數量 ({num_teams}) 不能超過成員數量 ({len(players)})")
+                return
+            
+            # 生成隊伍
+            teams = self.team_generator.generate_teams(players, num_teams)
+            team_flex = self._create_group_team_result_flex(teams, group_id)
+            self._send_flex_message(event.reply_token, "群組分隊結果", team_flex)
+            
+        except Exception as e:
+            print(f"Error handling group team command: {e}")
+            self._send_message(event.reply_token, "❌ 群組分隊失敗，請稍後再試")
+    
+    def _handle_group_players_command(self, event, group_id):
+        """處理群組成員清單指令"""
+        try:
+            # 同步群組成員（確保資料最新）
+            synced_count = self.group_manager.sync_group_members(group_id)
+            
+            # 獲取群組球員
+            players = self.group_manager.get_group_players_for_team(group_id)
+            
+            if not players:
+                message = "📋 群組成員清單\n\n"
+                message += "目前沒有偵測到群組成員\n\n"
+                message += "可能原因：\n"
+                message += "• 機器人缺少讀取群組成員權限\n"
+                message += "• 群組成員較少\n"
+                message += "• 需要手動同步：/sync"
+                self._send_message(event.reply_token, message)
+                return
+            
+            group_list_flex = self._create_group_player_list_flex(players, group_id)
+            self._send_flex_message(event.reply_token, "群組成員清單", group_list_flex)
+            
+        except Exception as e:
+            print(f"Error handling group players command: {e}")
+            self._send_message(event.reply_token, "❌ 獲取群組成員失敗，請稍後再試")
+    
+    def _handle_group_stats_command(self, event, group_id):
+        """處理群組統計指令"""
+        try:
+            stats = self.group_manager.get_group_stats(group_id)
+            
+            if not stats:
+                self._send_message(event.reply_token, "❌ 無法獲取群組統計資訊")
+                return
+            
+            message = "📊 群組統計資訊\n\n"
+            message += f"👥 群組總成員：{stats.get('total_members', 0)} 人\n"
+            message += f"🏀 可分隊成員：{stats.get('total_players', 0)} 人\n"
+            message += f"✅ 已註冊球員：{stats.get('registered_players', 0)} 人\n"
+            message += f"👤 群組成員：{stats.get('member_players', 0)} 人\n\n"
+            
+            if stats.get('avg_rating'):
+                message += f"⭐ 平均評分：{stats['avg_rating']:.1f}/10\n"
+                message += f"🎯 平均投籃：{stats['avg_shooting']:.1f}/10\n"
+                message += f"🛡️ 平均防守：{stats['avg_defense']:.1f}/10\n"
+                message += f"💪 平均體力：{stats['avg_stamina']:.1f}/10\n\n"
+            
+            # 分隊建議
+            from group_manager import suggest_group_team_sizes
+            suggestions = suggest_group_team_sizes(stats.get('total_players', 0))
+            if suggestions:
+                message += "💡 分隊建議：\n"
+                for _, description in suggestions[:2]:
+                    message += f"• {description}\n"
+            
+            self._send_message(event.reply_token, message)
+            
+        except Exception as e:
+            print(f"Error handling group stats command: {e}")
+            self._send_message(event.reply_token, "❌ 獲取群組統計失敗，請稍後再試")
+    
+    def _handle_sync_command(self, event, group_id):
+        """處理手動同步指令"""
+        try:
+            synced_count = self.group_manager.sync_group_members(group_id)
+            
+            if synced_count > 0:
+                message = f"✅ 同步完成！\n\n"
+                message += f"已同步 {synced_count} 位群組成員\n"
+                message += f"使用 /group_players 查看成員清單"
+            else:
+                message = "⚠️ 同步完成，但未偵測到新成員\n\n"
+                message += "可能原因：\n"
+                message += "• 所有成員都已同步\n"
+                message += "• 機器人缺少讀取權限\n"
+                message += "• 群組成員較少"
+            
+            self._send_message(event.reply_token, message)
+            
+        except Exception as e:
+            print(f"Error handling sync command: {e}")
+            self._send_message(event.reply_token, "❌ 同步失敗，請稍後再試")
     
     def _send_message(self, reply_token, message_text, quick_reply=None):
         """發送訊息"""
@@ -1023,6 +1215,348 @@ class LineMessageHandler:
             )
         )
         return bubble
+    
+    # === 群組專用 Flex Message 模板函數 ===
+    
+    def _create_group_player_list_flex(self, players: List[Player], group_id: str):
+        """創建群組成員清單 Flex Message"""
+        if not players:
+            return BubbleContainer(
+                body=BoxComponent(
+                    layout="vertical",
+                    contents=[
+                        TextComponent(
+                            text="📋 群組成員清單",
+                            weight="bold",
+                            size="xl",
+                            align="center",
+                            color="#4A90E2"
+                        ),
+                        SeparatorComponent(margin="md"),
+                        self._create_spacer(size="md"),
+                        TextComponent(
+                            text="目前沒有偵測到群組成員",
+                            align="center",
+                            color="#666666"
+                        ),
+                        self._create_spacer(size="md"),
+                        TextComponent(
+                            text="請使用 /sync 同步群組成員",
+                            align="center",
+                            size="sm",
+                            color="#999999"
+                        )
+                    ]
+                )
+            )
+
+        # 創建群組成員卡片列表
+        bubbles = []
+        registered_players = [p for p in players if p.is_registered]
+        member_players = [p for p in players if not p.is_registered]
+        
+        # 顯示註冊球員
+        for i, player in enumerate(registered_players[:5]):
+            player_bubble = BubbleContainer(
+                body=BoxComponent(
+                    layout="vertical",
+                    contents=[
+                        TextComponent(
+                            text=f"✅ {player.name}",
+                            weight="bold",
+                            size="md",
+                            color="#28A745"
+                        ),
+                        TextComponent(
+                            text="已註冊球員",
+                            size="sm",
+                            color="#666666",
+                            margin="sm"
+                        ),
+                        self._create_spacer(size="sm"),
+                        self._create_mini_skill_display(player),
+                        self._create_spacer(size="sm"),
+                        BoxComponent(
+                            layout="baseline",
+                            contents=[
+                                TextComponent(
+                                    text="總評：",
+                                    size="sm",
+                                    color="#666666",
+                                    flex=0
+                                ),
+                                TextComponent(
+                                    text=f"{player.overall_rating:.1f}/10",
+                                    weight="bold",
+                                    color="#FF6B35",
+                                    align="end"
+                                )
+                            ]
+                        )
+                    ]
+                )
+            )
+            bubbles.append(player_bubble)
+        
+        # 顯示群組成員
+        for i, player in enumerate(member_players[:5]):
+            player_bubble = BubbleContainer(
+                body=BoxComponent(
+                    layout="vertical",
+                    contents=[
+                        TextComponent(
+                            text=f"👤 {player.name}",
+                            weight="bold",
+                            size="md",
+                            color="#4A90E2"
+                        ),
+                        TextComponent(
+                            text="群組成員",
+                            size="sm",
+                            color="#666666",
+                            margin="sm"
+                        ),
+                        self._create_spacer(size="sm"),
+                        self._create_mini_skill_display(player),
+                        self._create_spacer(size="sm"),
+                        TextComponent(
+                            text="使用預設技能值",
+                            size="xs",
+                            color="#999999",
+                            align="center"
+                        )
+                    ]
+                )
+            )
+            bubbles.append(player_bubble)
+
+        # 添加統計總結卡片
+        summary_bubble = BubbleContainer(
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="📊 群組統計",
+                        weight="bold",
+                        size="md",
+                        color="#6F42C1"
+                    ),
+                    SeparatorComponent(margin="sm"),
+                    self._create_spacer(size="sm"),
+                    TextComponent(
+                        text=f"總成員數：{len(players)} 人",
+                        size="sm",
+                        color="#333333"
+                    ),
+                    self._create_spacer(size="xs"),
+                    TextComponent(
+                        text=f"已註冊：{len(registered_players)} 人",
+                        size="sm",
+                        color="#28A745"
+                    ),
+                    self._create_spacer(size="xs"),
+                    TextComponent(
+                        text=f"群組成員：{len(member_players)} 人",
+                        size="sm",
+                        color="#4A90E2"
+                    ),
+                    self._create_spacer(size="sm"),
+                    TextComponent(
+                        text=f"平均評分：{sum(p.overall_rating for p in players)/len(players):.1f}",
+                        size="sm",
+                        color="#666666"
+                    )
+                ]
+            ),
+            footer=BoxComponent(
+                layout="vertical",
+                contents=[
+                    ButtonComponent(
+                        action=PostbackAction(
+                            label="🏀 開始分隊",
+                            data=f"action=group_team&group_id={group_id}"
+                        ),
+                        style="primary",
+                        color="#FF6B35"
+                    )
+                ]
+            ) if len(players) >= 2 else None
+        )
+        bubbles.append(summary_bubble)
+
+        return CarouselContainer(contents=bubbles)
+    
+    def _create_group_team_result_flex(self, teams: List[List[Player]], group_id: str):
+        """創建群組分隊結果 Flex Message"""
+        if not teams:
+            return BubbleContainer(
+                body=BoxComponent(
+                    layout="vertical",
+                    contents=[
+                        TextComponent(
+                            text="❌ 群組分隊失敗",
+                            weight="bold",
+                            size="xl",
+                            align="center",
+                            color="#DC3545"
+                        ),
+                        self._create_spacer(size="md"),
+                        TextComponent(
+                            text="目前群組成員不足進行分隊",
+                            align="center",
+                            wrap=True,
+                            color="#666666"
+                        )
+                    ]
+                )
+            )
+
+        bubbles = []
+        stats = self.team_generator.get_team_stats(teams)
+        
+        # 為每個隊伍創建卡片
+        team_colors = ["#FF6B35", "#4A90E2", "#28A745", "#FD7E14", "#6F42C1"]
+        
+        for i, (team, stat) in enumerate(zip(teams, stats)):
+            color = team_colors[i % len(team_colors)]
+            
+            team_bubble = BubbleContainer(
+                body=BoxComponent(
+                    layout="vertical",
+                    contents=[
+                        TextComponent(
+                            text=f"🏀 群組第 {i+1} 隊",
+                            weight="bold",
+                            size="lg",
+                            align="center",
+                            color=color
+                        ),
+                        TextComponent(
+                            text=f"平均評分：{stat['avg_rating']:.1f}",
+                            size="sm",
+                            align="center",
+                            color="#666666",
+                            margin="sm"
+                        ),
+                        SeparatorComponent(margin="md"),
+                        self._create_spacer(size="sm"),
+                        *self._create_group_team_players_list(team),
+                        self._create_spacer(size="md"),
+                        self._create_team_stats_display(stat, color)
+                    ]
+                )
+            )
+            bubbles.append(team_bubble)
+        
+        # 添加群組分隊總結
+        if len(stats) >= 2:
+            ratings = [s['avg_rating'] for s in stats if s['player_count'] > 0]
+            balance_score = 10 - (max(ratings) - min(ratings)) if ratings else 0
+            
+            summary_bubble = BubbleContainer(
+                body=BoxComponent(
+                    layout="vertical",
+                    contents=[
+                        TextComponent(
+                            text="⚖️ 群組分隊總結",
+                            weight="bold",
+                            size="lg",
+                            align="center",
+                            color="#6F42C1"
+                        ),
+                        SeparatorComponent(margin="md"),
+                        self._create_spacer(size="md"),
+                        BoxComponent(
+                            layout="baseline",
+                            contents=[
+                                TextComponent(
+                                    text="隊伍平衡度：",
+                                    size="sm",
+                                    color="#666666",
+                                    flex=0
+                                ),
+                                TextComponent(
+                                    text=f"{balance_score:.1f}/10",
+                                    weight="bold",
+                                    size="md",
+                                    color="#FF6B35",
+                                    align="end"
+                                )
+                            ]
+                        ),
+                        self._create_spacer(size="sm"),
+                        TextComponent(
+                            text=self._get_balance_comment(balance_score),
+                            size="sm",
+                            wrap=True,
+                            align="center",
+                            color="#666666"
+                        ),
+                        self._create_spacer(size="md"),
+                        TextComponent(
+                            text=f"群組總共 {sum(len(team) for team in teams)} 位成員參與",
+                            size="xs",
+                            align="center",
+                            color="#999999"
+                        )
+                    ]
+                ),
+                footer=BoxComponent(
+                    layout="vertical",
+                    contents=[
+                        ButtonComponent(
+                            action=PostbackAction(
+                                label="🔄 重新分隊",
+                                data=f"action=group_reteam&group_id={group_id}"
+                            ),
+                            style="secondary"
+                        )
+                    ]
+                )
+            )
+            bubbles.append(summary_bubble)
+
+        return CarouselContainer(contents=bubbles)
+    
+    def _create_group_team_players_list(self, team: List[Player]):
+        """創建群組隊伍球員列表"""
+        if not team:
+            return [TextComponent(text="⚠️ 無成員", size="sm", color="#999999", align="center")]
+        
+        player_components = []
+        for j, player in enumerate(team, 1):
+            status_icon = "✅" if player.is_registered else "👤"
+            
+            player_components.append(
+                BoxComponent(
+                    layout="baseline",
+                    contents=[
+                        TextComponent(
+                            text=f"{j}.",
+                            size="sm",
+                            color="#666666",
+                            flex=0
+                        ),
+                        self._create_spacer(size="sm"),
+                        TextComponent(
+                            text=f"{status_icon} {player.name}",
+                            size="sm",
+                            color="#333333",
+                            flex=1
+                        ),
+                        TextComponent(
+                            text=f"{player.overall_rating:.1f}",
+                            weight="bold",
+                            size="sm",
+                            color="#FF6B35",
+                            align="end",
+                            flex=0
+                        )
+                    ],
+                    margin="xs"
+                )
+            )
+        return player_components
 
 # 測試功能
 if __name__ == "__main__":
