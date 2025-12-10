@@ -3,7 +3,7 @@
 
 import random
 from typing import List, Dict, Tuple
-from models import Player
+from src.models import Player
 
 class TeamGenerator:
     def __init__(self):
@@ -127,7 +127,7 @@ class TeamGenerator:
 
 # 測試功能
 if __name__ == "__main__":
-    from models import Player
+    from src.models import Player
     
     # 創建測試球員
     test_players = [
