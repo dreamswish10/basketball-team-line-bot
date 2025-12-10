@@ -22,8 +22,12 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
     DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     
-    # 資料庫設定
+    # 資料庫設定 (SQLite - 已棄用,保留向後兼容)
     DATABASE_NAME = 'basketball_teams.db'
+
+    # MongoDB 設定
+    MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/')
+    MONGODB_DB_NAME = os.getenv('MONGODB_DB_NAME', 'basketball_team_bot')
     
     # 分隊設定
     DEFAULT_SKILL_VALUE = 5
@@ -34,6 +38,9 @@ class Config:
     
     # 演算法參數
     RANDOM_FACTOR = 0.2  # 20% 機會選擇次優隊伍（避免固定分組）
+
+    # 出賽追蹤設定
+    PARTICIPATION_TRACKING_LIMIT = int(os.getenv('PARTICIPATION_TRACKING_LIMIT', '10'))  # 保留最近 N 次出賽記錄
     
     # 驗證設定
     @classmethod

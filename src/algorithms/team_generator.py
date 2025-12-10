@@ -2,12 +2,22 @@
 # -*- coding: utf-8 -*-
 
 import random
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
+from datetime import datetime
+from bson import ObjectId
 from src.models import Player
+from src.models.mongodb_models import DivisionsRepository, PlayersRepository
+from src.config import Config
+import logging
+
+logger = logging.getLogger(__name__)
 
 class TeamGenerator:
-    def __init__(self):
+    def __init__(self, divisions_repo: DivisionsRepository = None,
+                 players_repo: PlayersRepository = None):
         self.teams = []
+        self.divisions_repo = divisions_repo
+        self.players_repo = players_repo
     
     def generate_teams(self, players: List[Player], num_teams: int = 2) -> List[List[Player]]:
         """
@@ -113,7 +123,7 @@ class TeamGenerator:
     def suggest_optimal_teams(self, total_players: int) -> List[Tuple[int, str]]:
         """建議最佳分隊數量"""
         suggestions = []
-        
+
         if total_players >= 10:
             suggestions.append((2, f"2隊 (每隊約{total_players//2}人) - 5v5 全場"))
         if total_players >= 6:
@@ -122,8 +132,112 @@ class TeamGenerator:
             suggestions.append((3, f"3隊 (每隊約{total_players//3}人) - 輪替對戰"))
         if total_players >= 12:
             suggestions.append((4, f"4隊 (每隊約{total_players//4}人) - 小組賽"))
-        
+
         return suggestions[:3]  # 最多顯示 3 個建議
+
+    def save_division(self, teams: List[List[Player]], group_id: str = None,
+                      created_by_user_id: str = None) -> Optional[ObjectId]:
+        """
+        儲存分隊記錄到 MongoDB
+
+        Args:
+            teams: 分隊結果 (List of teams, each team is a List of Players)
+            group_id: 群組 ID (optional)
+            created_by_user_id: 建立者 user_id (optional)
+
+        Returns:
+            division_id (ObjectId) if successful, None otherwise
+        """
+        if not self.divisions_repo or not self.players_repo:
+            logger.warning("Repositories not initialized, skipping save_division")
+            return None
+
+        try:
+            # 1. 產生 division_name (使用當前時間)
+            division_name = datetime.now().strftime("%Y-%m-%d %H:%M")
+            created_at = datetime.now()
+
+            # 2. 準備 teams 資料結構
+            teams_data = []
+            stats = self.get_team_stats(teams)
+
+            for team_idx, (team, stat) in enumerate(zip(teams, stats)):
+                team_number = team_idx + 1
+
+                players_data = []
+                for player in team:
+                    player_data = {
+                        "user_id": player.user_id,
+                        "player_id": None,  # 可以後續從 MongoDB 取得 ObjectId
+                        "name": player.name,
+                        "skills_snapshot": {
+                            "shooting": player.shooting_skill,
+                            "defense": player.defense_skill,
+                            "stamina": player.stamina,
+                            "overall_rating": player.overall_rating
+                        }
+                    }
+                    players_data.append(player_data)
+
+                team_data = {
+                    "team_number": team_number,
+                    "players": players_data,
+                    "stats": stat
+                }
+                teams_data.append(team_data)
+
+            # 3. 計算 balance_score
+            if len(stats) >= 2:
+                ratings = [s['avg_rating'] for s in stats if s['player_count'] > 0]
+                if ratings:
+                    balance_score = 10 - (max(ratings) - min(ratings))
+                else:
+                    balance_score = 10.0
+            else:
+                balance_score = 10.0
+
+            # 4. 建立 division document
+            division_id = self.divisions_repo.create(
+                division_name=division_name,
+                teams_data=teams_data,
+                num_teams=len(teams),
+                group_id=group_id,
+                balance_score=balance_score,
+                algorithm_used="greedy_randomized",
+                created_by_user_id=created_by_user_id
+            )
+
+            if not division_id:
+                logger.error("Failed to create division in database")
+                return None
+
+            # 5. 更新每個球員的 participation_summary
+            participation_limit = Config.PARTICIPATION_TRACKING_LIMIT
+
+            for team_data in teams_data:
+                for player_data in team_data['players']:
+                    success = self.players_repo.add_participation(
+                        user_id=player_data['user_id'],
+                        division_id=division_id,
+                        team_number=team_data['team_number'],
+                        skills_snapshot=player_data['skills_snapshot'],
+                        participated_at=created_at,
+                        limit=participation_limit
+                    )
+
+                    if not success:
+                        logger.warning(
+                            f"Failed to update participation for player {player_data['user_id']}"
+                        )
+
+            logger.info(
+                f"Division saved successfully: {division_name} (ID: {division_id})"
+            )
+            return division_id
+
+        except Exception as e:
+            logger.error(f"Error saving division: {e}")
+            return None
 
 # 測試功能
 if __name__ == "__main__":

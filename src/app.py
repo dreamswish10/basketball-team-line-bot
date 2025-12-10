@@ -10,7 +10,14 @@ from linebot.models import (
 )
 import os
 from src.config import Config
-from src.models.player import init_db, Player
+from src.database.mongodb import init_mongodb, get_database
+from src.models.player import Player
+from src.models.mongodb_models import (
+    PlayersRepository,
+    GroupsRepository,
+    GroupMembersRepository,
+    DivisionsRepository
+)
 from src.handlers.line_handler import LineMessageHandler
 from src.handlers.group_manager import GroupManager
 
@@ -21,14 +28,34 @@ app.config.from_object(Config)
 line_bot_api = LineBotApi(app.config['LINE_CHANNEL_ACCESS_TOKEN'])
 handler = WebhookHandler(app.config['LINE_CHANNEL_SECRET'])
 
-# 初始化資料庫
-init_db()
+# 初始化 MongoDB
+init_mongodb()
 
-# LINE 訊息處理器
-message_handler = LineMessageHandler(line_bot_api, app.logger)
+# 取得 MongoDB database instance
+db = get_database()
 
-# 群組管理器
-group_manager = GroupManager(line_bot_api)
+# 初始化 Repositories
+players_repo = PlayersRepository(db)
+groups_repo = GroupsRepository(db)
+group_members_repo = GroupMembersRepository(db)
+divisions_repo = DivisionsRepository(db)
+
+# LINE 訊息處理器 (傳遞 repositories)
+message_handler = LineMessageHandler(
+    line_bot_api,
+    app.logger,
+    players_repo=players_repo,
+    divisions_repo=divisions_repo
+)
+
+# 群組管理器 (傳遞 repositories)
+group_manager = GroupManager(
+    line_bot_api,
+    players_repo=players_repo,
+    groups_repo=groups_repo,
+    group_members_repo=group_members_repo,
+    divisions_repo=divisions_repo
+)
 
 @app.route("/")
 def hello():
