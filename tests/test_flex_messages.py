@@ -11,9 +11,9 @@ import sys
 
 # 添加錯誤處理的導入
 try:
-    from line_handler import LineMessageHandler
-    from models import Player
-    from team_algorithm import TeamGenerator
+    from src.handlers.line_handler import LineMessageHandler
+    from src.models.player import Player
+    from src.algorithms.team_generator import TeamGenerator
 except ImportError as e:
     print(f"❌ 導入錯誤: {e}")
     print("\n可能的解決方案:")

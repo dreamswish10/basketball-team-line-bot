@@ -9,10 +9,10 @@ from linebot.models import (
     JoinEvent, MemberJoinedEvent, MemberLeftEvent, LeaveEvent
 )
 import os
-from config import Config
-from models import init_db, Player
-from line_handler import LineMessageHandler
-from group_manager import GroupManager
+from src.config import Config
+from src.models.player import init_db, Player
+from src.handlers.line_handler import LineMessageHandler
+from src.handlers.group_manager import GroupManager
 
 app = Flask(__name__)
 app.config.from_object(Config)

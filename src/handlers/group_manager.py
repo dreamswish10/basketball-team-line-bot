@@ -8,7 +8,7 @@
 from typing import List, Optional, Dict
 from linebot import LineBotApi
 from linebot.exceptions import LineBotApiError
-from models import Player, Group, GroupMember, GroupDatabase, PlayerDatabase
+from src.models.player import Player, Group, GroupMember, GroupDatabase, PlayerDatabase
 import logging
 
 class GroupManager:

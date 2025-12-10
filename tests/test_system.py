@@ -8,8 +8,8 @@
 
 import os
 import sys
-from models import init_db, Player, PlayerDatabase
-from team_algorithm import TeamGenerator
+from src.models.player import init_db, Player, PlayerDatabase
+from src.algorithms.team_generator import TeamGenerator
 
 def test_database():
     """測試資料庫功能"""

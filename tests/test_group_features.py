@@ -17,7 +17,7 @@ def test_database_models():
     print("🧪 測試資料庫模型...")
     
     try:
-        from models import init_db, Player, Group, GroupMember, PlayerDatabase, GroupDatabase
+        from src.models.player import init_db, Player, Group, GroupMember, PlayerDatabase, GroupDatabase
         
         # 初始化資料庫
         init_db()
@@ -57,7 +57,7 @@ def test_group_manager():
     print("\n🧪 測試群組管理器...")
     
     try:
-        from group_manager import GroupManager, suggest_group_team_sizes
+        from src.handlers.group_manager import GroupManager, suggest_group_team_sizes
         
         # 測試分隊建議
         suggestions = suggest_group_team_sizes(8)
@@ -96,8 +96,8 @@ def test_team_algorithm():
     print("\n🧪 測試分隊算法...")
     
     try:
-        from models import Player
-        from team_algorithm import TeamGenerator
+        from src.models.player import Player
+        from src.algorithms.team_generator import TeamGenerator
         
         # 創建混合球員清單（註冊+群組成員）
         players = [
@@ -138,7 +138,7 @@ def test_line_handler_integration():
     print("\n🧪 測試 LINE Handler 整合...")
     
     try:
-        from line_handler import LineMessageHandler
+        from src.handlers.line_handler import LineMessageHandler
         
         # 模擬 LINE Bot API
         class MockLineBotApi:
@@ -152,7 +152,7 @@ def test_line_handler_integration():
         print(f"✅ Spacer 創建成功: {type(spacer).__name__}")
         
         # 測試群組 Flex Message 創建
-        from models import Player
+        from src.models.player import Player
         test_players = [
             Player("user1", "測試球員1", 8, 7, 6, is_registered=True),
             Player("user2", "測試球員2", 5, 5, 5, source_group="test", is_registered=False),

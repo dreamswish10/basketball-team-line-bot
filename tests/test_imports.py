@@ -45,7 +45,7 @@ def test_imports():
     
     # 測試我們的修復後的導入
     try:
-        from line_handler import LineMessageHandler
+        from src.handlers.line_handler import LineMessageHandler
         print("✅ line_handler 導入成功")
     except ImportError as e:
         print(f"❌ line_handler 導入失敗: {e}")

@@ -26,9 +26,9 @@ except ImportError:
         except ImportError:
             # SpacerComponent 不可用，我們將使用替代方案
             SpacerComponent = None
-from models import Player, PlayerDatabase, GroupDatabase
-from team_algorithm import TeamGenerator
-from group_manager import GroupManager
+from src.models.player import Player, PlayerDatabase, GroupDatabase
+from src.algorithms.team_generator import TeamGenerator
+from src.handlers.group_manager import GroupManager
 
 class LineMessageHandler:
     def __init__(self, line_bot_api, logger=None):
