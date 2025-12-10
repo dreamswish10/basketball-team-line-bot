@@ -78,12 +78,22 @@ def handle_join(event):
     """處理 Bot 加入群組事件"""
     if hasattr(event.source, 'group_id'):
         group_id = event.source.group_id
-        app.logger.info(f"Bot joined group: {group_id}")
-        
+
+        # 增強：更詳細的開始日誌
+        app.logger.info(f"[GROUP_JOIN] ========================================")
+        app.logger.info(f"[GROUP_JOIN] Bot joined group: {group_id}")
+        app.logger.info(f"[GROUP_JOIN] Starting member synchronization...")
+
         try:
             # 自動同步群組成員
-            group_manager.sync_group_members(group_id)
-            
+            synced_count = group_manager.sync_group_members(group_id)
+
+            # 新增：記錄同步結果
+            app.logger.info(
+                f"[GROUP_JOIN] Member synchronization completed: "
+                f"{synced_count} members synced"
+            )
+
             # 發送歡迎訊息
             welcome_message = (
                 "🏀 籃球分隊機器人已加入群組！\n\n"
@@ -95,11 +105,16 @@ def handle_join(event):
                 "🔹 /register - 詳細註冊\n"
                 "🔹 /help - 完整說明"
             )
-            
+
             line_bot_api.push_message(group_id, TextSendMessage(text=welcome_message))
-            
+
+            # 新增：記錄完成
+            app.logger.info(f"[GROUP_JOIN] Welcome message sent to group {group_id}")
+            app.logger.info(f"[GROUP_JOIN] ========================================")
+
         except Exception as e:
-            app.logger.error(f"Error handling join event: {e}")
+            app.logger.error(f"[GROUP_JOIN] Error handling join event: {e}")
+            app.logger.info(f"[GROUP_JOIN] ========================================")
 
 @handler.add(MemberJoinedEvent)
 def handle_member_joined(event):

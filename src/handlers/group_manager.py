@@ -30,7 +30,10 @@ class GroupManager:
         try:
             # 獲取群組成員 ID 列表
             member_ids = self.line_bot_api.get_group_member_ids(group_id)
-            
+
+            # 新增：記錄獲取到的成員 ID 數量
+            self.logger.info(f"[GROUP_MEMBER_FETCH] Group {group_id}: Found {len(member_ids)} members")
+
             members = []
             for user_id in member_ids:
                 try:
@@ -42,23 +45,42 @@ class GroupManager:
                         'picture_url': getattr(profile, 'picture_url', None),
                         'status_message': getattr(profile, 'status_message', None)
                     })
-                    
+
+                    # 新增：記錄每個成功獲取的成員
+                    self.logger.info(
+                        f"[GROUP_MEMBER_FETCH] ✓ User ID: {user_id}, "
+                        f"Display Name: {profile.display_name}"
+                    )
+
                     # 短暫延遲避免 API 限制
                     import time
                     time.sleep(0.1)
-                    
+
                 except LineBotApiError as e:
                     self.logger.warning(f"Failed to get profile for user {user_id}: {e}")
                     # 如果無法獲取個人資料，仍然加入成員清單
+                    fallback_name = f"成員_{user_id[:8]}"
                     members.append({
                         'user_id': user_id,
-                        'display_name': f"成員_{user_id[:8]}",
+                        'display_name': fallback_name,
                         'picture_url': None,
                         'status_message': None
                     })
-            
+
+                    # 新增：記錄使用備用名稱的成員
+                    self.logger.warning(
+                        f"[GROUP_MEMBER_FETCH] ⚠ User ID: {user_id}, "
+                        f"Display Name: {fallback_name} (fallback)"
+                    )
+
+            # 新增：總結日誌
+            self.logger.info(
+                f"[GROUP_MEMBER_FETCH] Group {group_id}: "
+                f"Successfully fetched {len(members)} member profiles"
+            )
+
             return members
-            
+
         except LineBotApiError as e:
             self.logger.error(f"Failed to fetch group members: {e}")
             return []
@@ -69,16 +91,24 @@ class GroupManager:
     def sync_group_members(self, group_id: str) -> int:
         """同步群組成員到資料庫"""
         try:
+            self.logger.info(f"[GROUP_MEMBER_SYNC] Starting sync for group {group_id}")
+
             # 從 LINE API 獲取最新成員清單
             api_members = self.fetch_group_members(group_id)
-            
+
             if not api_members:
                 self.logger.warning(f"No members found for group {group_id}")
                 return 0
-            
+
+            # 新增：記錄即將同步的成員總數
+            self.logger.info(
+                f"[GROUP_MEMBER_SYNC] Group {group_id}: "
+                f"Syncing {len(api_members)} members to database"
+            )
+
             # 先註冊群組（如果不存在）
             self.register_group(group_id)
-            
+
             synced_count = 0
             for member_data in api_members:
                 try:
@@ -88,16 +118,36 @@ class GroupManager:
                         user_id=member_data['user_id'],
                         display_name=member_data['display_name']
                     )
-                    
+
                     if GroupDatabase.add_group_member(member):
                         synced_count += 1
-                    
+                        # 新增：記錄成功同步的成員
+                        self.logger.info(
+                            f"[GROUP_MEMBER_SYNC] ✓ Synced - "
+                            f"User ID: {member_data['user_id']}, "
+                            f"Display Name: {member_data['display_name']}"
+                        )
+                    else:
+                        # 新增：記錄同步失敗的情況
+                        self.logger.warning(
+                            f"[GROUP_MEMBER_SYNC] ✗ Failed to sync - "
+                            f"User ID: {member_data['user_id']}, "
+                            f"Display Name: {member_data['display_name']}"
+                        )
+
                 except Exception as e:
-                    self.logger.error(f"Error syncing member {member_data['user_id']}: {e}")
-            
-            self.logger.info(f"Synced {synced_count} members for group {group_id}")
+                    self.logger.error(
+                        f"Error syncing member {member_data['user_id']} "
+                        f"({member_data['display_name']}): {e}"
+                    )
+
+            # 增強：更詳細的總結日誌
+            self.logger.info(
+                f"[GROUP_MEMBER_SYNC] Group {group_id}: "
+                f"Successfully synced {synced_count}/{len(api_members)} members"
+            )
             return synced_count
-            
+
         except Exception as e:
             self.logger.error(f"Error syncing group members: {e}")
             return 0
