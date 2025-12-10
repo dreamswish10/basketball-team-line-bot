@@ -31,8 +31,9 @@ from team_algorithm import TeamGenerator
 from group_manager import GroupManager
 
 class LineMessageHandler:
-    def __init__(self, line_bot_api):
+    def __init__(self, line_bot_api, logger=None):
         self.line_bot_api = line_bot_api
+        self.logger = logger
         self.team_generator = TeamGenerator()
         self.group_manager = GroupManager(line_bot_api)
     
@@ -63,64 +64,106 @@ class LineMessageHandler:
                 margin=margin
             )
             return spacer_text
-    
+
+    def _log_info(self, message):
+        """安全的 info 日誌"""
+        if self.logger:
+            self.logger.info(message)
+        else:
+            print(f"[INFO] {message}")
+
+    def _log_warning(self, message):
+        """安全的 warning 日誌"""
+        if self.logger:
+            self.logger.warning(message)
+        else:
+            print(f"[WARNING] {message}")
+
+    def _log_error(self, message):
+        """安全的 error 日誌"""
+        if self.logger:
+            self.logger.error(message)
+        else:
+            print(f"[ERROR] {message}")
+
     def handle_text_message(self, event):
         """處理文字訊息"""
         user_id = event.source.user_id
         message_text = event.message.text.strip()
-        
+
         try:
             # 檢查是否為群組訊息
             is_group = hasattr(event.source, 'group_id')
             group_id = getattr(event.source, 'group_id', None)
+
+            # 記錄收到的訊息
+            self._log_info(f"[MESSAGE] User: {user_id}, Text: '{message_text}', Source: {'Group' if is_group else 'Private'}")
+            if is_group:
+                self._log_info(f"[GROUP] Group ID: {group_id}")
             
             # 根據指令路由到不同的處理函數
             if message_text.startswith('/group_team') or message_text.startswith('群組分隊'):
+                self._log_info(f"[COMMAND] Matched: /group_team, User: {user_id}")
                 if is_group:
                     self._handle_group_team_command(event, message_text, group_id)
                 else:
                     self._send_message(event.reply_token, "❌ 此指令只能在群組中使用")
             elif message_text.startswith('/group_players') or message_text.startswith('群組成員'):
+                self._log_info(f"[COMMAND] Matched: /group_players, User: {user_id}")
                 if is_group:
                     self._handle_group_players_command(event, group_id)
                 else:
                     self._send_message(event.reply_token, "❌ 此指令只能在群組中使用")
             elif message_text.startswith('/group_stats') or message_text.startswith('群組統計'):
+                self._log_info(f"[COMMAND] Matched: /group_stats, User: {user_id}")
                 if is_group:
                     self._handle_group_stats_command(event, group_id)
                 else:
                     self._send_message(event.reply_token, "❌ 此指令只能在群組中使用")
             elif message_text.startswith('/sync') or message_text.startswith('同步成員'):
+                self._log_info(f"[COMMAND] Matched: /sync, User: {user_id}")
                 if is_group:
                     self._handle_sync_command(event, group_id)
                 else:
                     self._send_message(event.reply_token, "❌ 此指令只能在群組中使用")
             elif message_text.startswith('/register') or message_text.startswith('註冊'):
+                self._log_info(f"[COMMAND] Matched: /register, User: {user_id}")
                 self._handle_register_command(event, message_text, group_id)
             elif message_text.startswith('/list') or message_text == '球員列表':
+                self._log_info(f"[COMMAND] Matched: /list, User: {user_id}")
                 self._handle_list_command(event)
             elif message_text.startswith('/team') or message_text.startswith('分隊'):
+                self._log_info(f"[COMMAND] Matched: /team, User: {user_id}")
                 self._handle_team_command(event, message_text)
             elif message_text.startswith('/profile') or message_text == '我的資料':
+                self._log_info(f"[COMMAND] Matched: /profile, User: {user_id}")
                 self._handle_profile_command(event, user_id)
             elif message_text.startswith('/delete') or message_text == '刪除資料':
+                self._log_info(f"[COMMAND] Matched: /delete, User: {user_id}")
                 self._handle_delete_command(event, user_id)
             elif message_text.startswith('/help') or message_text == '幫助' or message_text == '說明':
+                self._log_info(f"[COMMAND] Matched: /help, User: {user_id}")
                 self._handle_help_command(event, is_group)
             elif message_text == '開始':
+                self._log_info(f"[COMMAND] Matched: 開始, User: {user_id}")
                 self._handle_start_command(event)
             else:
+                self._log_warning(f"[UNKNOWN] Command not recognized: '{message_text}', User: {user_id}")
                 self._handle_unknown_command(event, is_group)
                 
         except Exception as e:
-            print(f"Error handling message: {e}")
+            import traceback
+            self._log_error(f"[ERROR] Error handling message from {user_id}: {e}")
+            self._log_error(traceback.format_exc())
             self._send_message(event.reply_token, "❌ 系統發生錯誤，請稍後再試")
     
     def handle_postback_event(self, event):
         """處理 Postback 事件"""
         user_id = event.source.user_id
         data = event.postback.data
-        
+
+        self._log_info(f"[POSTBACK] User: {user_id}, Data: '{data}'")
+
         try:
             # 解析 postback 數據
             if data == "action=register_help":
@@ -161,9 +204,11 @@ class LineMessageHandler:
                     self._send_message(event.reply_token, "❌ 無法識別群組資訊")
             else:
                 self._send_message(event.reply_token, "❓ 未知的操作")
-                
+
         except Exception as e:
-            print(f"Error handling postback: {e}")
+            import traceback
+            self._log_error(f"[ERROR] Error handling postback from {user_id}: {e}")
+            self._log_error(traceback.format_exc())
             self._send_message(event.reply_token, "❌ 系統發生錯誤，請稍後再試")
     
     def _handle_register_command(self, event, message_text, group_id=None):
@@ -483,18 +528,26 @@ class LineMessageHandler:
     def _send_message(self, reply_token, message_text, quick_reply=None):
         """發送訊息"""
         try:
+            self._log_info(f"[SEND] Sending message: '{message_text[:50]}...' to token: {reply_token[:10]}...")
             message = TextSendMessage(text=message_text, quick_reply=quick_reply)
             self.line_bot_api.reply_message(reply_token, message)
+            self._log_info(f"[SUCCESS] Message sent successfully")
         except Exception as e:
-            print(f"Error sending message: {e}")
+            import traceback
+            self._log_error(f"[ERROR] Error sending message: {e}")
+            self._log_error(traceback.format_exc())
     
     def _send_flex_message(self, reply_token, alt_text, flex_content):
         """發送 Flex Message"""
         try:
+            self._log_info(f"[SEND] Sending flex message: '{alt_text}' to token: {reply_token[:10]}...")
             message = FlexSendMessage(alt_text=alt_text, contents=flex_content)
             self.line_bot_api.reply_message(reply_token, message)
+            self._log_info(f"[SUCCESS] Flex message sent successfully")
         except Exception as e:
-            print(f"Error sending flex message: {e}")
+            import traceback
+            self._log_error(f"[ERROR] Error sending flex message: {e}")
+            self._log_error(traceback.format_exc())
     
     # === Flex Message 模板函數 ===
     

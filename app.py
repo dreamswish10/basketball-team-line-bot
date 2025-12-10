@@ -25,7 +25,7 @@ handler = WebhookHandler(app.config['LINE_CHANNEL_SECRET'])
 init_db()
 
 # LINE 訊息處理器
-message_handler = LineMessageHandler(line_bot_api)
+message_handler = LineMessageHandler(line_bot_api, app.logger)
 
 # 群組管理器
 group_manager = GroupManager(line_bot_api)
@@ -42,17 +42,31 @@ def callback():
     # 獲取 request body
     body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)
+    app.logger.info("[WEBHOOK] Received webhook request")
+    app.logger.info(f"[WEBHOOK] Signature: {signature[:20]}...")
 
     # 驗證 webhook 簽名
     try:
+        app.logger.info("[WEBHOOK] Verifying signature...")
         handler.handle(body, signature)
+        app.logger.info("[WEBHOOK] Signature verified successfully")
     except InvalidSignatureError:
+        app.logger.error("[ERROR] Invalid signature - webhook verification failed")
         abort(400)
 
     return 'OK'
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
+    user_id = event.source.user_id
+    message_text = event.message.text
+    source_type = event.source.type
+
+    app.logger.info(f"[WEBHOOK] Message event received")
+    app.logger.info(f"[WEBHOOK] User ID: {user_id}")
+    app.logger.info(f"[WEBHOOK] Source Type: {source_type}")
+    app.logger.info(f"[WEBHOOK] Message Text: '{message_text}'")
+
     message_handler.handle_text_message(event)
 
 @handler.add(PostbackEvent)
