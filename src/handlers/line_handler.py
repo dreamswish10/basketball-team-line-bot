@@ -932,9 +932,9 @@ class LineMessageHandler:
             teams = self._generate_simple_teams(players)
             
             # 創建分隊結果 Flex Message
-            result_flex = self._create_custom_team_result_flex(teams, mapping_info)
+            # result_flex = self._create_custom_team_result_flex(teams, mapping_info)
             
-            self._send_flex_message(event.reply_token, "自定義分隊結果", result_flex)
+            self._send_flex_message(event.reply_token, "自定義分隊結果", "")
             
         except Exception as e:
             self._log_error(f"Error in custom team command: {e}")
