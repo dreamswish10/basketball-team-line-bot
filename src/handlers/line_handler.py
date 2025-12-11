@@ -900,165 +900,220 @@ class LineMessageHandler:
         return message
     
     def _create_custom_team_result_flex(self, teams, mapping_info):
-        """創建自定義分隊結果 Flex Message (Carousel 樣式)"""
+        """創建自定義分隊結果 Flex Message (官方 Carousel 樣式)"""
         bubbles = []
+        team_colors = ["#27ACB2", "#FF6B6E", "#A17DF5", "#4ECDC4", "#45B7D1", "#96CEB4"]
         
-        # 第一個 Bubble：主要資訊
-        main_bubble = self._create_main_info_bubble(teams, mapping_info)
-        bubbles.append(main_bubble)
+        # 如果只有一隊且人數 <= 4，返回簡單 bubble
+        if len(teams) == 1 and len(teams[0]) <= 4:
+            return self._create_simple_team_bubble(teams[0], mapping_info)
         
-        # 為每個隊伍創建專屬 Bubble
-        team_bubbles = self._create_team_bubbles(teams)
-        bubbles.extend(team_bubbles)
+        # 為每個隊伍創建 nano bubble
+        for i, team in enumerate(teams):
+            color = team_colors[i % len(team_colors)]
+            team_bubble = self._create_nano_team_bubble(team, i + 1, color)
+            bubbles.append(team_bubble)
         
-        # 如果只有一個 bubble，直接返回該 bubble
-        if len(bubbles) == 1:
-            return bubbles[0]
+        # 如果有映射資訊，添加資訊 bubble
+        if mapping_info['identified'] or mapping_info['strangers']:
+            info_bubble = self._create_info_nano_bubble(mapping_info, len(teams))
+            bubbles.insert(0, info_bubble)  # 放在第一位
         
         # 創建 Carousel
         carousel = CarouselContainer(contents=bubbles)
         return carousel
     
-    def _create_main_info_bubble(self, teams, mapping_info):
-        """創建主要資訊 Bubble"""
-        total_players = sum(len(team) for team in teams)
-        
-        body_contents = [
-            # 標題
-            TextComponent(
-                text="🏀 自定義分隊結果",
-                weight="bold",
-                size="xl",
-                align="center",
-                color="#FF6B35"
-            ),
-            SeparatorComponent(margin="md"),
-            self._create_spacer(size="md")
-        ]
-        
-        # 添加成員映射區塊
-        if mapping_info['identified'] or mapping_info['strangers']:
-            mapping_section = self._create_member_mapping_section(mapping_info)
-            body_contents.extend(mapping_section)
-            body_contents.append(self._create_spacer(size="md"))
-        
-        # 添加分隊說明區塊  
-        info_section = self._create_team_info_section(total_players)
-        body_contents.extend(info_section)
-        
-        # 添加分隊總覽
-        body_contents.append(self._create_spacer(size="md"))
-        body_contents.append(
-            TextComponent(
-                text=f"🏆 共分成 {len(teams)} 隊",
-                weight="bold",
-                size="lg",
-                align="center",
-                color="#FF6B35"
-            )
-        )
-        
-        # 簡要隊伍資訊
-        for i, team in enumerate(teams, 1):
-            body_contents.append(
-                TextComponent(
-                    text=f"隊伍 {i}: {len(team)} 人",
-                    size="sm",
-                    align="center",
-                    color="#666666",
-                    margin="xs"
-                )
-            )
-        
+    def _create_nano_team_bubble(self, team, team_number, color):
+        """創建 nano 尺寸的隊伍 Bubble"""
         return BubbleContainer(
-            direction="ltr",
+            size="nano",
+            header=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text=f"隊伍 {team_number}",
+                        color="#ffffff",
+                        align="start",
+                        size="md",
+                        gravity="center",
+                        weight="bold"
+                    ),
+                    TextComponent(
+                        text=f"{len(team)} 人",
+                        color="#ffffff",
+                        align="start",
+                        size="xs",
+                        gravity="center",
+                        margin="lg"
+                    )
+                ],
+                backgroundColor=color,
+                paddingTop="19px",
+                paddingAll="12px",
+                paddingBottom="16px"
+            ),
             body=BoxComponent(
                 layout="vertical",
-                contents=body_contents,
-                spacing="sm"
+                contents=[
+                    BoxComponent(
+                        layout="horizontal",
+                        contents=[
+                            TextComponent(
+                                text=self._format_team_members(team),
+                                color="#8C8C8C",
+                                size="sm",
+                                wrap=True
+                            )
+                        ],
+                        flex=1
+                    )
+                ],
+                spacing="md",
+                paddingAll="12px"
+            ),
+            styles={
+                "footer": {
+                    "separator": False
+                }
+            }
+        )
+    
+    def _create_info_nano_bubble(self, mapping_info, team_count):
+        """創建資訊 nano bubble"""
+        # 計算已識別和路人的數量
+        identified_count = len(mapping_info.get('identified', []))
+        strangers_count = len(mapping_info.get('strangers', []))
+        total_count = identified_count + strangers_count
+        
+        # 創建進度條效果
+        identified_percentage = int((identified_count / total_count * 100)) if total_count > 0 else 0
+        
+        return BubbleContainer(
+            size="nano",
+            header=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="分隊資訊",
+                        color="#ffffff",
+                        align="start",
+                        size="md",
+                        gravity="center",
+                        weight="bold"
+                    ),
+                    TextComponent(
+                        text=f"已識別 {identified_percentage}%",
+                        color="#ffffff",
+                        align="start",
+                        size="xs",
+                        gravity="center",
+                        margin="lg"
+                    ),
+                    BoxComponent(
+                        layout="vertical",
+                        contents=[
+                            BoxComponent(
+                                layout="vertical",
+                                contents=[
+                                    # 使用 filler 需要特殊處理，這裡改用 text
+                                    TextComponent(text=" ", size="xxs")
+                                ],
+                                width=f"{identified_percentage}%",
+                                backgroundColor="#0D8186",
+                                height="6px"
+                            )
+                        ],
+                        backgroundColor="#9FD8E36E",
+                        height="6px",
+                        margin="sm"
+                    )
+                ],
+                backgroundColor="#4ECDC4",
+                paddingTop="19px",
+                paddingAll="12px",
+                paddingBottom="16px"
+            ),
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    BoxComponent(
+                        layout="horizontal",
+                        contents=[
+                            TextComponent(
+                                text=f"共分成 {team_count} 隊\n已識別 {identified_count} 人，新增 {strangers_count} 人",
+                                color="#8C8C8C",
+                                size="sm",
+                                wrap=True
+                            )
+                        ],
+                        flex=1
+                    )
+                ],
+                spacing="md",
+                paddingAll="12px"
+            ),
+            styles={
+                "footer": {
+                    "separator": False
+                }
+            }
+        )
+    
+    def _create_simple_team_bubble(self, team, mapping_info):
+        """為 ≤4 人創建簡單 bubble"""
+        return BubbleContainer(
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="👥 人數太少，不需分隊",
+                        weight="bold",
+                        size="lg",
+                        align="center",
+                        color="#FF6B35"
+                    ),
+                    SeparatorComponent(margin="md"),
+                    BoxComponent(
+                        layout="vertical",
+                        contents=[
+                            TextComponent(
+                                text=f"成員名單 ({len(team)}人):",
+                                weight="bold",
+                                size="md",
+                                color="#333333",
+                                margin="md"
+                            )
+                        ] + [
+                            TextComponent(
+                                text=f"{i+1}. {player['name']}",
+                                size="sm",
+                                color="#666666",
+                                margin="sm"
+                            ) for i, player in enumerate(team)
+                        ] + [
+                            TextComponent(
+                                text="💡 建議直接一起打球！",
+                                size="sm",
+                                color="#28A745",
+                                margin="md",
+                                weight="bold"
+                            )
+                        ]
+                    )
+                ],
+                spacing="sm",
+                paddingAll="16px"
             ),
             footer=self._create_team_result_footer()
         )
     
-    def _create_team_bubbles(self, teams):
-        """為每個隊伍創建專屬 Bubble"""
-        team_bubbles = []
-        team_colors = ["#007BFF", "#28A745", "#DC3545", "#6F42C1", "#FD7E14", "#20C997"]
-        
-        # 如果只有一隊且人數少於等於4人，不創建額外的隊伍 bubble
-        if len(teams) == 1 and len(teams[0]) <= 4:
-            return team_bubbles
-        
-        for i, team in enumerate(teams):
-            color = team_colors[i % len(team_colors)]
-            team_name = "全體成員" if len(teams) == 1 else f"隊伍 {i+1}"
-            
-            # 創建隊員列表
-            member_contents = []
-            for j, player in enumerate(team, 1):
-                member_contents.append(
-                    BoxComponent(
-                        layout="baseline",
-                        contents=[
-                            TextComponent(
-                                text=f"{j}.",
-                                size="sm",
-                                color="#FFFFFF",
-                                flex=0,
-                                margin="none"
-                            ),
-                            TextComponent(
-                                text=player['name'],
-                                size="md",
-                                color="#FFFFFF",
-                                weight="bold",
-                                margin="sm"
-                            )
-                        ],
-                        margin="sm"
-                    )
-                )
-            
-            # 創建隊伍 Bubble
-            team_bubble = BubbleContainer(
-                direction="ltr",
-                body=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        # 隊伍標題
-                        TextComponent(
-                            text=team_name,
-                            weight="bold",
-                            size="xl",
-                            align="center",
-                            color="#FFFFFF"
-                        ),
-                        TextComponent(
-                            text=f"({len(team)} 人)",
-                            size="md",
-                            align="center",
-                            color="#FFFFFF",
-                            margin="sm"
-                        ),
-                        SeparatorComponent(margin="md", color="#FFFFFF66"),
-                        self._create_spacer(size="md"),
-                        
-                        # 隊員列表
-                        BoxComponent(
-                            layout="vertical",
-                            contents=member_contents,
-                            spacing="xs"
-                        )
-                    ],
-                    backgroundColor=color,
-                    paddingAll="lg",
-                    spacing="sm"
-                )
-            )
-            
-            team_bubbles.append(team_bubble)
-        
-        return team_bubbles
+    def _format_team_members(self, team):
+        """格式化隊伍成員為字串"""
+        member_names = [player['name'] for player in team]
+        if len(member_names) <= 3:
+            return "、".join(member_names)
+        else:
+            return "、".join(member_names[:3]) + f"等{len(member_names)}人"
     
     def _create_member_mapping_section(self, mapping_info):
         """創建成員映射區塊"""
