@@ -989,7 +989,7 @@ class LineMessageHandler:
                         margin="lg"
                     )
                 ],
-                color=color,
+                backgroundColor=color,
                 paddingTop="19px",
                 paddingAll="12px",
                 paddingBottom="16px"
@@ -1014,6 +1014,9 @@ class LineMessageHandler:
                 paddingAll="12px"
             ),
             styles={
+                "header": {
+                    "backgroundColor": "#ffaaaa"
+                },
                 "footer": {
                     "separator": False
                 }
