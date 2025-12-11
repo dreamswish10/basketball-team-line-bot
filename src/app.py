@@ -162,9 +162,11 @@ def setup_hardcoded_aliases():
                 "exact": ["Akin"],
                 "patterns": ["*Akin*", "Akin*", "kin*", "*kin"],
                 "regex": [r"\d+Akin", r"Akin\d+"] 
+            }
         }
         
         setup_count = 0
+        
         for user_id, aliases in hardcoded_aliases.items():
             # 檢查是否已存在，避免重複設定
             existing_aliases = alias_repo.get_aliases_by_user_id(user_id)

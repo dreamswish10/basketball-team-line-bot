@@ -25,6 +25,8 @@ def get_mongo_client():
                 serverSelectionTimeoutMS=5000,  # 5秒超時
                 connectTimeoutMS=10000,  # 10秒連線超時
                 socketTimeoutMS=10000,   # 10秒 socket 超時
+                tls=True,  # 啟用 TLS
+                tlsAllowInvalidCertificates=True,  # 允許無效證書（開發環境）
             )
             # 測試連線
             _mongo_client.admin.command('ping')
