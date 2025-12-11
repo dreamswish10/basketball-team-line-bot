@@ -16,7 +16,9 @@ from src.models.mongodb_models import (
     PlayersRepository,
     GroupsRepository,
     GroupMembersRepository,
-    DivisionsRepository
+    DivisionsRepository,
+    AttendancesRepository,
+    AliasMapRepository
 )
 from src.handlers.line_handler import LineMessageHandler
 from src.handlers.group_manager import GroupManager
@@ -39,13 +41,13 @@ players_repo = PlayersRepository(db)
 groups_repo = GroupsRepository(db)
 group_members_repo = GroupMembersRepository(db)
 divisions_repo = DivisionsRepository(db)
+attendances_repo = AttendancesRepository(db)
+alias_map_repo = AliasMapRepository(db)
 
-# LINE 訊息處理器 (傳遞 repositories)
+# LINE 訊息處理器
 message_handler = LineMessageHandler(
     line_bot_api,
-    app.logger,
-    players_repo=players_repo,
-    divisions_repo=divisions_repo
+    app.logger
 )
 
 # 群組管理器 (傳遞 repositories)

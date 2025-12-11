@@ -101,6 +101,19 @@ def create_indexes():
         )
         db.divisions.create_index([("division_name", ASCENDING)], name="division_name")
 
+        # Attendances collection indexes
+        logger.info("Creating indexes for 'attendances' collection...")
+        db.attendances.create_index([("date", ASCENDING)], unique=True, name="date_unique")
+        db.attendances.create_index([("date", DESCENDING)], name="date_desc")
+        db.attendances.create_index([("teams.members.userId", ASCENDING)], name="user_attendances")
+        db.attendances.create_index([("teams.teamId", ASCENDING)], name="team_id")
+
+        # AliasMap collection indexes
+        logger.info("Creating indexes for 'aliasMap' collection...")
+        db.aliasMap.create_index([("userId", ASCENDING)], unique=True, name="userId_unique")
+        db.aliasMap.create_index([("aliases", ASCENDING)], name="aliases")
+        db.aliasMap.create_index([("aliases", "text")], name="aliases_text_search")
+
         logger.info("All indexes created successfully")
 
     except OperationFailure as e:
