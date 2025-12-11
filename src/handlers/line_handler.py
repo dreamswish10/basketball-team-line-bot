@@ -148,8 +148,8 @@ class LineMessageHandler:
             elif message_text == '開始':
                 self._log_info(f"[COMMAND] Matched: 開始, User: {user_id}")
                 self._handle_start_command(event)
-            elif self._is_custom_team_message(message_text):
-                self._log_info(f"[COMMAND] Matched: custom team, User: {user_id}")
+            elif message_text.startswith('/分隊') or message_text.startswith('分隊'):
+                self._log_info(f"[COMMAND] Matched: /分隊, User: {user_id}")
                 self._handle_custom_team_command(event, message_text)
             else:
                 self._log_warning(f"[UNKNOWN] Command not recognized: '{message_text}', User: {user_id}")
@@ -604,37 +604,66 @@ class LineMessageHandler:
     # 已移除 _create_skill_bar - 不再使用 Player 類
     # 已移除所有 Player 相關的 Flex Message 方法
     
-    def _is_custom_team_message(self, message_text):
-        """檢查是否為自定義分隊訊息"""
-        import re
-        
-        # 檢查是否包含多個成員名稱（以分隔符分隔）
-        # 支援的分隔符：、，,
-        separators = r'[、，,]'
-        
-        # 移除可能的前綴（如 "日："）
-        clean_text = re.sub(r'^[^：:]*[：:]', '', message_text).strip()
-        
-        # 檢查是否包含分隔符且有多個元素
-        if re.search(separators, clean_text):
-            parts = re.split(separators, clean_text)
-            # 過濾掉空字符串和長度小於1的元素
-            valid_parts = [p.strip() for p in parts if p.strip() and len(p.strip()) >= 1]
+    # 已移除 _is_custom_team_message - 改用 /分隊 指令觸發
+    
+    def _extract_reply_content(self, event):
+        """提取回覆訊息的內容"""
+        try:
+            # 檢查是否有回覆訊息
+            if hasattr(event.message, 'quoted_message_id') and event.message.quoted_message_id:
+                self._log_info(f"[REPLY] Detected reply to message: {event.message.quoted_message_id}")
+                
+                # 注意：LINE Bot API 通常無法直接獲取被回覆訊息的內容
+                # 這裡需要根據實際的 LINE Bot SDK 版本來實作
+                # 目前先返回 None，表示無法獲取回覆內容
+                self._log_warning(f"[REPLY] Cannot fetch replied message content with current LINE Bot API")
+                return None
             
-            # 至少需要2個有效成員名稱
-            if len(valid_parts) >= 2:
-                self._log_info(f"[CUSTOM_TEAM] Detected custom team message with {len(valid_parts)} members")
-                return True
-        
-        return False
+            return None
+            
+        except Exception as e:
+            self._log_error(f"Error extracting reply content: {e}")
+            return None
     
     def _handle_custom_team_command(self, event, message_text):
         """處理自定義分隊指令"""
         import re
         
         try:
+            # 提取要處理的內容
+            target_text = None
+            
+            # 1. 先檢查是否有回覆訊息
+            reply_content = self._extract_reply_content(event)
+            if reply_content:
+                target_text = reply_content
+                self._log_info(f"[TEAM_CMD] Using reply content: {target_text[:50]}...")
+            else:
+                # 2. 檢查指令後是否有內容
+                # 移除 /分隊 或 分隊 前綴
+                clean_command = re.sub(r'^/?分隊\s*', '', message_text).strip()
+                if clean_command:
+                    target_text = clean_command
+                    self._log_info(f"[TEAM_CMD] Using command content: {target_text[:50]}...")
+                else:
+                    # 3. 沒有內容可處理
+                    self._send_message(event.reply_token, 
+                        "❌ 請提供成員名單\n\n"
+                        "使用方式：\n"
+                        "🔸 /分隊 🥛、凱、豪、金\n"
+                        "🔸 回覆包含成員名單的訊息，然後輸入 /分隊")
+                    return
+            
+            # 檢查內容是否包含成員名稱分隔符
+            if not self._is_valid_team_content(target_text):
+                self._send_message(event.reply_token,
+                    "❌ 無法識別成員名單\n\n"
+                    "請確保成員名稱用逗號、頓號分隔\n"
+                    "例如：🥛、凱、豪、金、kin、勇")
+                return
+            
             # 解析成員名稱
-            member_names = self._parse_member_names(message_text)
+            member_names = self._parse_member_names(target_text)
             if len(member_names) < 1:
                 self._send_message(event.reply_token, "❌ 請至少輸入 1 位成員名稱")
                 return
@@ -644,6 +673,18 @@ class LineMessageHandler:
             
             if len(players) < 1:
                 self._send_message(event.reply_token, "❌ 無法創建球員列表")
+                return
+            
+            # 檢查人數是否需要分隊
+            if len(players) <= 4:
+                # 人數少，不需分隊，發送簡單文字訊息
+                message = f"👥 人數太少，不需分隊\n\n"
+                message += f"成員名單 ({len(players)}人):\n"
+                for i, player in enumerate(players, 1):
+                    message += f"{i}. {player['name']}\n"
+                message += "\n💡 建議直接一起打球！"
+                
+                self._send_message(event.reply_token, message)
                 return
             
             # 使用智能分隊邏輯（自動決定隊伍數量）
@@ -657,6 +698,21 @@ class LineMessageHandler:
         except Exception as e:
             self._log_error(f"Error in custom team command: {e}")
             self._send_message(event.reply_token, "❌ 分隊處理失敗，請稍後再試")
+    
+    def _is_valid_team_content(self, text):
+        """檢查文字是否包含有效的成員名單格式"""
+        import re
+        if not text:
+            return False
+        
+        # 檢查是否包含分隔符
+        separators = r'[、，,]'
+        if re.search(separators, text):
+            return True
+        
+        # 如果沒有分隔符，檢查是否至少有一個字符（單人也可以）
+        clean_text = re.sub(r'^[^：:]*[：:]', '', text).strip()
+        return len(clean_text) > 0
     
     def _parse_member_names(self, message_text):
         """解析訊息中的成員名稱"""
@@ -844,10 +900,29 @@ class LineMessageHandler:
         return message
     
     def _create_custom_team_result_flex(self, teams, mapping_info):
-        """創建自定義分隊結果 Flex Message"""
+        """創建自定義分隊結果 Flex Message (Carousel 樣式)"""
+        bubbles = []
+        
+        # 第一個 Bubble：主要資訊
+        main_bubble = self._create_main_info_bubble(teams, mapping_info)
+        bubbles.append(main_bubble)
+        
+        # 為每個隊伍創建專屬 Bubble
+        team_bubbles = self._create_team_bubbles(teams)
+        bubbles.extend(team_bubbles)
+        
+        # 如果只有一個 bubble，直接返回該 bubble
+        if len(bubbles) == 1:
+            return bubbles[0]
+        
+        # 創建 Carousel
+        carousel = CarouselContainer(contents=bubbles)
+        return carousel
+    
+    def _create_main_info_bubble(self, teams, mapping_info):
+        """創建主要資訊 Bubble"""
         total_players = sum(len(team) for team in teams)
         
-        # 創建主體內容
         body_contents = [
             # 標題
             TextComponent(
@@ -870,14 +945,32 @@ class LineMessageHandler:
         # 添加分隊說明區塊  
         info_section = self._create_team_info_section(total_players)
         body_contents.extend(info_section)
+        
+        # 添加分隊總覽
         body_contents.append(self._create_spacer(size="md"))
+        body_contents.append(
+            TextComponent(
+                text=f"🏆 共分成 {len(teams)} 隊",
+                weight="bold",
+                size="lg",
+                align="center",
+                color="#FF6B35"
+            )
+        )
         
-        # 添加分隊結果區塊
-        teams_section = self._create_teams_display_section(teams)
-        body_contents.extend(teams_section)
+        # 簡要隊伍資訊
+        for i, team in enumerate(teams, 1):
+            body_contents.append(
+                TextComponent(
+                    text=f"隊伍 {i}: {len(team)} 人",
+                    size="sm",
+                    align="center",
+                    color="#666666",
+                    margin="xs"
+                )
+            )
         
-        # 創建 Bubble
-        bubble = BubbleContainer(
+        return BubbleContainer(
             direction="ltr",
             body=BoxComponent(
                 layout="vertical",
@@ -886,8 +979,86 @@ class LineMessageHandler:
             ),
             footer=self._create_team_result_footer()
         )
+    
+    def _create_team_bubbles(self, teams):
+        """為每個隊伍創建專屬 Bubble"""
+        team_bubbles = []
+        team_colors = ["#007BFF", "#28A745", "#DC3545", "#6F42C1", "#FD7E14", "#20C997"]
         
-        return bubble
+        # 如果只有一隊且人數少於等於4人，不創建額外的隊伍 bubble
+        if len(teams) == 1 and len(teams[0]) <= 4:
+            return team_bubbles
+        
+        for i, team in enumerate(teams):
+            color = team_colors[i % len(team_colors)]
+            team_name = "全體成員" if len(teams) == 1 else f"隊伍 {i+1}"
+            
+            # 創建隊員列表
+            member_contents = []
+            for j, player in enumerate(team, 1):
+                member_contents.append(
+                    BoxComponent(
+                        layout="baseline",
+                        contents=[
+                            TextComponent(
+                                text=f"{j}.",
+                                size="sm",
+                                color="#FFFFFF",
+                                flex=0,
+                                margin="none"
+                            ),
+                            TextComponent(
+                                text=player['name'],
+                                size="md",
+                                color="#FFFFFF",
+                                weight="bold",
+                                margin="sm"
+                            )
+                        ],
+                        margin="sm"
+                    )
+                )
+            
+            # 創建隊伍 Bubble
+            team_bubble = BubbleContainer(
+                direction="ltr",
+                body=BoxComponent(
+                    layout="vertical",
+                    contents=[
+                        # 隊伍標題
+                        TextComponent(
+                            text=team_name,
+                            weight="bold",
+                            size="xl",
+                            align="center",
+                            color="#FFFFFF"
+                        ),
+                        TextComponent(
+                            text=f"({len(team)} 人)",
+                            size="md",
+                            align="center",
+                            color="#FFFFFF",
+                            margin="sm"
+                        ),
+                        SeparatorComponent(margin="md", color="#FFFFFF66"),
+                        self._create_spacer(size="md"),
+                        
+                        # 隊員列表
+                        BoxComponent(
+                            layout="vertical",
+                            contents=member_contents,
+                            spacing="xs"
+                        )
+                    ],
+                    backgroundColor=color,
+                    paddingAll="lg",
+                    spacing="sm"
+                )
+            )
+            
+            team_bubbles.append(team_bubble)
+        
+        return team_bubbles
     
     def _create_member_mapping_section(self, mapping_info):
         """創建成員映射區塊"""

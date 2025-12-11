@@ -32,32 +32,56 @@ def test_full_custom_team():
         handler = LineMessageHandler(None, None)
         alias_repo = AliasMapRepository(db)
         
-        # 測試範例字串們
+        # 測試範例字串們（使用新的 /分隊 指令格式）
         test_cases = [
-            "日：沒復發就全力🥛、凱、豪、金、kin、勇",
-            "🥛,凱,豪,金,kin,勇,阿華,小李",
-            "奶、Akin、金毛、張律、路人甲、路人乙",
-            "69,小明,細,榮,未知1,未知2,未知3"
+            "/分隊 日：沒復發就全力🥛、凱、豪、金、kin、勇",
+            "/分隊 🥛,凱,豪,金,kin,勇,阿華,小李", 
+            "/分隊 奶、Akin、金毛、張律、路人甲、路人乙",
+            "/分隊 69,小明,細,榮,未知1,未知2,未知3",
+            "/分隊 豪、凱",  # 測試≤4人情況
+            "/分隊",  # 測試無內容情況
         ]
         
         for i, test_message in enumerate(test_cases, 1):
             print(f"\n🧪 測試案例 {i}: {test_message}")
             print("-" * 50)
             
-            # 1. 檢測是否為自定義分隊訊息
-            is_custom = handler._is_custom_team_message(test_message)
-            print(f"🔍 識別結果: {is_custom}")
+            # 模擬 LINE Bot Event
+            from collections import namedtuple
+            MockEvent = namedtuple('Event', ['reply_token', 'message', 'source'])
+            MockMessage = namedtuple('Message', ['text'])
+            MockSource = namedtuple('Source', ['user_id'])
             
-            if not is_custom:
-                print("❌ 未識別為自定義分隊訊息")
+            # 檢查是否為 /分隊 指令
+            is_team_command = test_message.startswith('/分隊') or test_message.startswith('分隊')
+            print(f"🔍 指令識別: {'✅ 分隊指令' if is_team_command else '❌ 非分隊指令'}")
+            
+            if not is_team_command:
+                print("❌ 不是分隊指令，跳過")
                 continue
             
-            # 2. 解析成員名稱
-            member_names = handler._parse_member_names(test_message)
-            print(f"📝 解析成員: {member_names}")
-            print(f"📊 成員數量: {len(member_names)}")
+            # 模擬指令處理
+            print(f"\n🤖 模擬指令處理流程:")
             
-            # 3. 別名映射測試
+            # 提取指令內容
+            import re
+            clean_command = re.sub(r'^/?分隊\s*', '', test_message).strip()
+            print(f"📝 提取內容: '{clean_command}'")
+            
+            if not clean_command:
+                print("❌ 無內容可處理")
+                continue
+            
+            # 檢查是否為有效內容
+            if not handler._is_valid_team_content(clean_command):
+                print("❌ 無效的成員名單格式")
+                continue
+            
+            # 解析成員名稱
+            member_names = handler._parse_member_names(clean_command)
+            print(f"📊 解析成員: {member_names} (共 {len(member_names)} 位)")
+            
+            # 別名映射測試
             print(f"\n🔗 別名映射測試:")
             for name in member_names:
                 mapped_id = alias_repo.find_user_by_alias(name)
@@ -66,7 +90,7 @@ def test_full_custom_team():
                 else:
                     print(f"  ❓ '{name}' → 未找到，將建立為路人")
             
-            # 4. 創建球員列表
+            # 創建球員列表
             print(f"\n👥 創建球員列表:")
             players, mapping_info = handler._create_players_from_names(member_names)
             print(f"  總球員數: {len(players)}")
@@ -79,10 +103,10 @@ def test_full_custom_team():
             for item in mapping_info['strangers']:
                 print(f"  👤 {item['input']} → {item['stranger']}")
             
-            # 5. 進行分隊
-            if len(players) >= 2:
-                print(f"\n⚽ 進行分隊:")
-                teams = handler._generate_simple_teams(players, num_teams=2)
+            # 進行分隊（使用新的智能分隊）
+            if len(players) >= 1:
+                print(f"\n⚽ 進行智能分隊:")
+                teams = handler._generate_simple_teams(players)
                 
                 print(f"  生成隊伍數: {len(teams)}")
                 for j, team in enumerate(teams, 1):
@@ -90,12 +114,17 @@ def test_full_custom_team():
                     for k, player in enumerate(team, 1):
                         print(f"    {k}. {player['name']}")
                 
-                # 6. 生成完整結果訊息
-                print(f"\n📱 完整結果訊息:")
+                # 生成 Flex UI 結果
+                print(f"\n📱 Flex UI 結果:")
+                result_flex = handler._create_custom_team_result_flex(teams, mapping_info)
+                print("  ✅ Flex Message 創建成功")
+                
+                # 也生成文字版本作為參考
+                print(f"\n📝 文字版本結果:")
                 result_message = handler._create_custom_team_result_message(teams, mapping_info)
                 print(result_message)
             else:
-                print("❌ 球員數量不足，無法分隊")
+                print("❌ 無球員可分隊")
         
         print("\n🎉 所有測試完成！")
         

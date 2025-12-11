@@ -33,14 +33,15 @@ def interactive_test():
         print(f"\n📚 可用的內部成員別名:")
         print("🥛/奶, 凱, 豪, 金/金毛, kin/Akin, 勇, 舊, 宇, 傑, 翔")
         print("華, 圈, 小明, 軍, 展, 盟, 小林, 諴, 榮, 細, 69, 張律")
-        print(f"\n💡 支援格式:")
-        print("- 日：🥛、凱、豪、金、kin、勇")
-        print("- 🥛,凱,豪,金,kin,勇,阿華")
-        print("- 奶、Akin、金毛、張律、路人甲")
+        print(f"\n💡 新的指令格式:")
+        print("- /分隊 🥛、凱、豪、金、kin、勇")
+        print("- /分隊 🥛,凱,豪,金,kin,勇,阿華")
+        print("- /分隊 奶、Akin、金毛、張律、路人甲")
+        print("- 分隊 豪、凱  (可省略斜線)")
         
         while True:
             print(f"\n" + "="*50)
-            user_input = input("📝 請輸入分隊訊息 (或輸入 'quit' 退出): ").strip()
+            user_input = input("📝 請輸入 /分隊 指令 (或輸入 'quit' 退出): ").strip()
             
             if user_input.lower() == 'quit':
                 print("👋 再見！")
@@ -53,20 +54,34 @@ def interactive_test():
             print(f"\n🔍 處理訊息: {user_input}")
             print("-" * 40)
             
-            # 檢測是否為自定義分隊訊息
-            is_custom = handler._is_custom_team_message(user_input)
-            print(f"識別結果: {'✅ 自定義分隊' if is_custom else '❌ 非分隊訊息'}")
+            # 檢查是否為 /分隊 指令
+            is_team_command = user_input.startswith('/分隊') or user_input.startswith('分隊')
+            print(f"指令識別: {'✅ 分隊指令' if is_team_command else '❌ 非分隊指令'}")
             
-            if not is_custom:
-                print("💡 提示: 請使用逗號、頓號或中文逗號分隔成員名稱")
+            if not is_team_command:
+                print("💡 提示: 請以 '/分隊' 開頭，例如: /分隊 🥛、凱、豪")
+                continue
+            
+            # 提取指令內容
+            import re
+            clean_command = re.sub(r'^/?分隊\s*', '', user_input).strip()
+            print(f"📝 提取內容: '{clean_command}'")
+            
+            if not clean_command:
+                print("❌ 無內容可處理，請提供成員名單")
+                continue
+            
+            # 檢查是否為有效內容
+            if not handler._is_valid_team_content(clean_command):
+                print("❌ 無效的成員名單格式，請使用逗號、頓號分隔")
                 continue
             
             # 解析成員名稱
-            member_names = handler._parse_member_names(user_input)
+            member_names = handler._parse_member_names(clean_command)
             print(f"解析成員: {member_names} (共 {len(member_names)} 位)")
             
-            if len(member_names) < 2:
-                print("❌ 至少需要2位成員才能分隊")
+            if len(member_names) < 1:
+                print("❌ 請至少輸入1位成員")
                 continue
             
             # 別名映射
@@ -81,8 +96,8 @@ def interactive_test():
             # 創建球員並分隊
             players, mapping_info = handler._create_players_from_names(member_names)
             
-            if len(players) >= 2:
-                teams = handler._generate_simple_teams(players, num_teams=2)
+            if len(players) >= 1:
+                teams = handler._generate_simple_teams(players)
                 
                 print(f"\n🏆 分隊結果:")
                 for i, team in enumerate(teams, 1):
@@ -116,30 +131,45 @@ def quick_test():
         init_mongodb()
         handler = LineMessageHandler(None, None)
         
-        # 預定義測試案例
+        # 預定義測試案例（使用新的 /分隊 格式）
         test_cases = [
-            "日：沒復發就全力🥛、凱、豪、金、kin、勇",
-            "🥛,凱,豪,金,kin,勇,阿華,小李",
-            "奶、Akin、金毛、張律、路人甲、路人乙"
+            "/分隊 日：沒復發就全力🥛、凱、豪、金、kin、勇",
+            "/分隊 🥛,凱,豪,金,kin,勇,阿華,小李",
+            "/分隊 奶、Akin、金毛、張律、路人甲、路人乙",
+            "/分隊 豪、凱",  # 測試小隊情況
+            "/分隊",  # 測試無內容
         ]
         
         for i, test in enumerate(test_cases, 1):
             print(f"\n測試 {i}: {test}")
             print("-" * 30)
             
-            if handler._is_custom_team_message(test):
-                member_names = handler._parse_member_names(test)
+            # 檢查是否為 /分隊 指令
+            is_team_command = test.startswith('/分隊') or test.startswith('分隊')
+            if is_team_command:
+                import re
+                clean_command = re.sub(r'^/?分隊\s*', '', test).strip()
+                
+                if not clean_command:
+                    print("❌ 無內容可處理")
+                    continue
+                
+                if not handler._is_valid_team_content(clean_command):
+                    print("❌ 無效的成員名單格式")
+                    continue
+                
+                member_names = handler._parse_member_names(clean_command)
                 players, mapping_info = handler._create_players_from_names(member_names)
                 
-                if len(players) >= 2:
-                    teams = handler._generate_simple_teams(players, num_teams=2)
+                if len(players) >= 1:
+                    teams = handler._generate_simple_teams(players)
                     
                     for j, team in enumerate(teams, 1):
                         print(f"隊伍 {j}: {[p['name'] for p in team]}")
                 else:
-                    print("人數不足")
+                    print("無球員可分隊")
             else:
-                print("未識別為分隊訊息")
+                print("未識別為分隊指令")
                 
     except Exception as e:
         print(f"快速測試失敗: {e}")
