@@ -1,268 +1,40 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+TeamGenerator - 已棄用
+
+注意：此模組已被簡化的分隊功能取代。
+新的自定義分隊功能直接在 LineMessageHandler 中實現。
+"""
+
 import random
-from typing import List, Dict, Tuple, Optional
-from datetime import datetime
-from bson import ObjectId
-from src.models import Player
-from src.models.mongodb_models import DivisionsRepository, PlayersRepository
-from src.config import Config
+from typing import List, Dict
 import logging
 
 logger = logging.getLogger(__name__)
 
 class TeamGenerator:
-    def __init__(self, divisions_repo: DivisionsRepository = None,
-                 players_repo: PlayersRepository = None):
+    """已棄用的 TeamGenerator 類"""
+    
+    def __init__(self):
         self.teams = []
-        self.divisions_repo = divisions_repo
-        self.players_repo = players_repo
+        logger.warning("TeamGenerator is deprecated. Use LineMessageHandler._generate_simple_teams() instead.")
     
-    def generate_teams(self, players: List[Player], num_teams: int = 2) -> List[List[Player]]:
-        """
-        根據球員技能生成平衡的隊伍
-        使用貪心演算法 + 隨機因子確保公平性
-        """
+    def generate_teams(self, players: List, num_teams: int = 2) -> List[List]:
+        """已棄用的分隊方法"""
+        logger.warning("generate_teams() is deprecated. Use _generate_simple_teams() instead.")
+        
+        # 簡單的回退實現
         if len(players) < num_teams:
-            raise ValueError(f"球員數量 ({len(players)}) 不能少於隊伍數量 ({num_teams})")
+            return [players]
         
-        # 根據總體評分排序球員（降序）
-        sorted_players = sorted(players, key=lambda p: p.overall_rating, reverse=True)
-        
-        # 初始化隊伍
+        # 隨機分配
+        random.shuffle(players)
         teams = [[] for _ in range(num_teams)]
-        team_ratings = [0.0] * num_teams
         
-        # 分配球員到隊伍
-        for player in sorted_players:
-            # 找到目前總評分最低的隊伍
-            min_team_idx = team_ratings.index(min(team_ratings))
-            
-            # 加入隨機因子：有 20% 機會選擇次低的隊伍（避免過度固定分組）
-            if len(teams[min_team_idx]) > 0 and random.random() < 0.2:
-                team_ratings_copy = team_ratings.copy()
-                team_ratings_copy[min_team_idx] = float('inf')  # 排除最低的
-                if min(team_ratings_copy) != float('inf'):
-                    min_team_idx = team_ratings_copy.index(min(team_ratings_copy))
-            
-            # 將球員加入選中的隊伍
-            teams[min_team_idx].append(player)
-            team_ratings[min_team_idx] += player.overall_rating
+        for i, player in enumerate(players):
+            team_index = i % num_teams
+            teams[team_index].append(player)
         
-        self.teams = teams
         return teams
-    
-    def get_team_stats(self, teams: List[List[Player]]) -> List[Dict]:
-        """計算每隊的統計資料"""
-        stats = []
-        
-        for i, team in enumerate(teams):
-            if not team:
-                stats.append({
-                    'team_number': i + 1,
-                    'player_count': 0,
-                    'avg_shooting': 0,
-                    'avg_defense': 0,
-                    'avg_stamina': 0,
-                    'total_rating': 0,
-                    'avg_rating': 0
-                })
-                continue
-            
-            total_shooting = sum(p.shooting_skill for p in team)
-            total_defense = sum(p.defense_skill for p in team)
-            total_stamina = sum(p.stamina for p in team)
-            total_rating = sum(p.overall_rating for p in team)
-            
-            stats.append({
-                'team_number': i + 1,
-                'player_count': len(team),
-                'avg_shooting': total_shooting / len(team),
-                'avg_defense': total_defense / len(team),
-                'avg_stamina': total_stamina / len(team),
-                'total_rating': total_rating,
-                'avg_rating': total_rating / len(team)
-            })
-        
-        return stats
-    
-    def format_teams_message(self, teams: List[List[Player]]) -> str:
-        """格式化隊伍訊息用於 LINE Bot 回覆"""
-        if not teams:
-            return "❌ 目前沒有分隊資料"
-        
-        message_lines = ["🏀 籃球分隊結果 🏀\n"]
-        
-        stats = self.get_team_stats(teams)
-        
-        for i, (team, stat) in enumerate(zip(teams, stats)):
-            team_num = i + 1
-            message_lines.append(f"🔥 第 {team_num} 隊 (平均評分: {stat['avg_rating']:.1f})")
-            
-            if not team:
-                message_lines.append("  ⚠️ 無球員")
-            else:
-                for j, player in enumerate(team, 1):
-                    message_lines.append(f"  {j}. {player.name} ({player.overall_rating:.1f})")
-            
-            # 顯示隊伍統計
-            message_lines.append(f"  📊 投籃:{stat['avg_shooting']:.1f} | 防守:{stat['avg_defense']:.1f} | 體力:{stat['avg_stamina']:.1f}")
-            message_lines.append("")  # 空行分隔
-        
-        # 計算平衡度
-        if len(stats) >= 2:
-            ratings = [s['avg_rating'] for s in stats if s['player_count'] > 0]
-            if ratings:
-                balance_score = (max(ratings) - min(ratings))
-                message_lines.append(f"⚖️ 隊伍平衡度: {10 - balance_score:.1f}/10")
-                message_lines.append("(數值越高表示隊伍越平衡)")
-        
-        return "\n".join(message_lines)
-    
-    def suggest_optimal_teams(self, total_players: int) -> List[Tuple[int, str]]:
-        """建議最佳分隊數量"""
-        suggestions = []
-
-        if total_players >= 10:
-            suggestions.append((2, f"2隊 (每隊約{total_players//2}人) - 5v5 全場"))
-        if total_players >= 6:
-            suggestions.append((2, f"2隊 (每隊約{total_players//2}人) - 3v3 半場"))
-        if total_players >= 9:
-            suggestions.append((3, f"3隊 (每隊約{total_players//3}人) - 輪替對戰"))
-        if total_players >= 12:
-            suggestions.append((4, f"4隊 (每隊約{total_players//4}人) - 小組賽"))
-
-        return suggestions[:3]  # 最多顯示 3 個建議
-
-    def save_division(self, teams: List[List[Player]], group_id: str = None,
-                      created_by_user_id: str = None) -> Optional[ObjectId]:
-        """
-        儲存分隊記錄到 MongoDB
-
-        Args:
-            teams: 分隊結果 (List of teams, each team is a List of Players)
-            group_id: 群組 ID (optional)
-            created_by_user_id: 建立者 user_id (optional)
-
-        Returns:
-            division_id (ObjectId) if successful, None otherwise
-        """
-        if not self.divisions_repo or not self.players_repo:
-            logger.warning("Repositories not initialized, skipping save_division")
-            return None
-
-        try:
-            # 1. 產生 division_name (使用當前時間)
-            division_name = datetime.now().strftime("%Y-%m-%d %H:%M")
-            created_at = datetime.now()
-
-            # 2. 準備 teams 資料結構
-            teams_data = []
-            stats = self.get_team_stats(teams)
-
-            for team_idx, (team, stat) in enumerate(zip(teams, stats)):
-                team_number = team_idx + 1
-
-                players_data = []
-                for player in team:
-                    player_data = {
-                        "user_id": player.user_id,
-                        "player_id": None,  # 可以後續從 MongoDB 取得 ObjectId
-                        "name": player.name,
-                        "skills_snapshot": {
-                            "shooting": player.shooting_skill,
-                            "defense": player.defense_skill,
-                            "stamina": player.stamina,
-                            "overall_rating": player.overall_rating
-                        }
-                    }
-                    players_data.append(player_data)
-
-                team_data = {
-                    "team_number": team_number,
-                    "players": players_data,
-                    "stats": stat
-                }
-                teams_data.append(team_data)
-
-            # 3. 計算 balance_score
-            if len(stats) >= 2:
-                ratings = [s['avg_rating'] for s in stats if s['player_count'] > 0]
-                if ratings:
-                    balance_score = 10 - (max(ratings) - min(ratings))
-                else:
-                    balance_score = 10.0
-            else:
-                balance_score = 10.0
-
-            # 4. 建立 division document
-            division_id = self.divisions_repo.create(
-                division_name=division_name,
-                teams_data=teams_data,
-                num_teams=len(teams),
-                group_id=group_id,
-                balance_score=balance_score,
-                algorithm_used="greedy_randomized",
-                created_by_user_id=created_by_user_id
-            )
-
-            if not division_id:
-                logger.error("Failed to create division in database")
-                return None
-
-            # 5. 更新每個球員的 participation_summary
-            participation_limit = Config.PARTICIPATION_TRACKING_LIMIT
-
-            for team_data in teams_data:
-                for player_data in team_data['players']:
-                    success = self.players_repo.add_participation(
-                        user_id=player_data['user_id'],
-                        division_id=division_id,
-                        team_number=team_data['team_number'],
-                        skills_snapshot=player_data['skills_snapshot'],
-                        participated_at=created_at,
-                        limit=participation_limit
-                    )
-
-                    if not success:
-                        logger.warning(
-                            f"Failed to update participation for player {player_data['user_id']}"
-                        )
-
-            logger.info(
-                f"Division saved successfully: {division_name} (ID: {division_id})"
-            )
-            return division_id
-
-        except Exception as e:
-            logger.error(f"Error saving division: {e}")
-            return None
-
-# 測試功能
-if __name__ == "__main__":
-    from src.models import Player
-    
-    # 創建測試球員
-    test_players = [
-        Player("user1", "Kobe Bryant", 10, 8, 7),
-        Player("user2", "LeBron James", 9, 9, 9),
-        Player("user3", "Stephen Curry", 10, 6, 8),
-        Player("user4", "Kawhi Leonard", 8, 10, 7),
-        Player("user5", "Kevin Durant", 10, 7, 8),
-        Player("user6", "Giannis", 7, 9, 10),
-        Player("user7", "Chris Paul", 7, 8, 9),
-        Player("user8", "Anthony Davis", 8, 9, 7),
-    ]
-    
-    # 測試分隊
-    generator = TeamGenerator()
-    teams = generator.generate_teams(test_players, 2)
-    
-    print("=== 測試分隊結果 ===")
-    print(generator.format_teams_message(teams))
-    
-    print("\n=== 分隊建議 ===")
-    suggestions = generator.suggest_optimal_teams(len(test_players))
-    for num_teams, description in suggestions:
-        print(f"{num_teams} 隊: {description}")

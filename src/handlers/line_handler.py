@@ -26,21 +26,17 @@ except ImportError:
         except ImportError:
             # SpacerComponent 不可用，我們將使用替代方案
             SpacerComponent = None
-from src.models.player import Player
-from src.models.mongodb_models import PlayersRepository
+from src.models.mongodb_models import AliasMapRepository
 from src.database.mongodb import get_database
-from src.algorithms.team_generator import TeamGenerator
-from src.handlers.group_manager import GroupManager
+import random
 
 class LineMessageHandler:
     def __init__(self, line_bot_api, logger=None):
         self.line_bot_api = line_bot_api
         self.logger = logger
-        self.team_generator = TeamGenerator()
-        self.group_manager = GroupManager(line_bot_api)
         # Initialize MongoDB repositories
         db = get_database()
-        self.players_repo = PlayersRepository(db)
+        self.alias_repo = AliasMapRepository(db)
     
     def _create_spacer(self, size="md", margin=None):
         """創建間距組件 - 安全的 SpacerComponent 替代方案"""
@@ -152,6 +148,9 @@ class LineMessageHandler:
             elif message_text == '開始':
                 self._log_info(f"[COMMAND] Matched: 開始, User: {user_id}")
                 self._handle_start_command(event)
+            elif self._is_custom_team_message(message_text):
+                self._log_info(f"[COMMAND] Matched: custom team, User: {user_id}")
+                self._handle_custom_team_command(event, message_text)
             else:
                 self._log_warning(f"[UNKNOWN] Command not recognized: '{message_text}', User: {user_id}")
                 self._handle_unknown_command(event, is_group)
@@ -249,18 +248,8 @@ class LineMessageHandler:
                     self._send_message(event.reply_token, "❌ 技能值必須在 1-10 範圍內")
                     return
                 
-                # 創建球員
-                player = Player(user_id, name, shooting, defense, stamina, 
-                              source_group=group_id, is_registered=True)
-                
-                # Create player using MongoDB repository
-                if self.players_repo.create(player.user_id, player.name, 
-                                          player.shooting_skill, player.defense_skill, 
-                                          player.stamina, group_id, True):
-                    register_flex = self._create_register_success_flex(player)
-                    self._send_flex_message(event.reply_token, "球員註冊成功", register_flex)
-                else:
-                    self._send_message(event.reply_token, "❌ 註冊失敗，請稍後再試")
+                # 已移除 Player 註冊功能
+                self._send_message(event.reply_token, "❌ 球員註冊功能已移除，請使用自定義分隊功能")
                 return
         
         # 如果沒有匹配到任何格式
@@ -272,80 +261,20 @@ class LineMessageHandler:
         )
     
     def _handle_list_command(self, event):
-        """處理球員列表指令"""
-        # Get players from MongoDB and convert to Player objects
-        player_docs = self.players_repo.get_all()
-        players = [Player.from_dict(doc) for doc in player_docs]
-        list_flex = self._create_player_list_flex(players)
-        self._send_flex_message(event.reply_token, "球員列表", list_flex)
+        """處理球員列表指令 - 已移除"""
+        self._send_message(event.reply_token, "❌ 球員列表功能已移除，請使用自定義分隊功能")
     
     def _handle_team_command(self, event, message_text):
-        """處理分隊指令"""
-        # Get players from MongoDB and convert to Player objects
-        player_docs = self.players_repo.get_all()
-        players = [Player.from_dict(doc) for doc in player_docs]
-        
-        if len(players) < 2:
-            self._send_message(event.reply_token, "❌ 至少需要 2 位球員才能分隊")
-            return
-        
-        # 解析隊伍數量
-        num_teams = 2  # 預設 2 隊
-        
-        patterns = [
-            r'/team\s+(\d+)',  # /team 3
-            r'分隊\s+(\d+)',    # 分隊 3
-        ]
-        
-        for pattern in patterns:
-            match = re.match(pattern, message_text)
-            if match:
-                try:
-                    num_teams = int(match.group(1))
-                except ValueError:
-                    pass
-                break
-        
-        # 驗證隊伍數量
-        if num_teams < 2:
-            self._send_message(event.reply_token, "❌ 至少需要分成 2 隊")
-            return
-        
-        if num_teams > len(players):
-            self._send_message(event.reply_token, f"❌ 隊伍數量 ({num_teams}) 不能超過球員數量 ({len(players)})")
-            return
-        
-        # 生成隊伍
-        try:
-            teams = self.team_generator.generate_teams(players, num_teams)
-            team_flex = self._create_team_result_flex(teams)
-            self._send_flex_message(event.reply_token, "分隊結果", team_flex)
-        except Exception as e:
-            print(f"Error generating teams: {e}")
-            self._send_message(event.reply_token, "❌ 分隊失敗，請稍後再試")
+        """處理分隊指令 - 已移除"""
+        self._send_message(event.reply_token, "❌ 傳統分隊功能已移除，請使用自定義分隊功能")
     
     def _handle_profile_command(self, event, user_id):
-        """處理個人資料查詢指令"""
-        # Get player from MongoDB and convert to Player object
-        player_doc = self.players_repo.get(user_id)
-        player = Player.from_dict(player_doc) if player_doc else None
-        
-        if player:
-            profile_flex = self._create_profile_flex(player)
-            self._send_flex_message(event.reply_token, "個人資料", profile_flex)
-        else:
-            message = "❌ 您還沒有註冊\n\n"
-            message += "使用 /register 指令註冊球員"
-            self._send_message(event.reply_token, message)
+        """處理個人資料查詢指令 - 已移除"""
+        self._send_message(event.reply_token, "❌ 個人資料功能已移除，請使用自定義分隊功能")
     
     def _handle_delete_command(self, event, user_id):
-        """處理刪除資料指令"""
-        if self.players_repo.delete(user_id):
-            message = "✅ 您的球員資料已刪除"
-        else:
-            message = "❌ 刪除失敗或您還沒有註冊"
-        
-        self._send_message(event.reply_token, message)
+        """處理刪除資料指令 - 已移除"""
+        self._send_message(event.reply_token, "❌ 刪除功能已移除，請使用自定義分隊功能")
     
     def _handle_help_command(self, event, is_group=False):
         """處理幫助指令"""
@@ -651,979 +580,174 @@ class LineMessageHandler:
         )
         return bubble
     
-    def _create_register_success_flex(self, player: Player):
-        """創建球員註冊成功 Flex Message"""
-        bubble = BubbleContainer(
-            body=BoxComponent(
-                layout="vertical",
-                contents=[
-                    TextComponent(
-                        text="✅ 註冊成功！",
-                        weight="bold",
-                        size="xl",
-                        align="center",
-                        color="#28A745"
-                    ),
-                    SeparatorComponent(margin="md"),
-                    self._create_spacer(size="md"),
-                    BoxComponent(
-                        layout="vertical",
-                        contents=[
-                            TextComponent(
-                                text=f"👤 {player.name}",
-                                weight="bold",
-                                size="lg",
-                                align="center",
-                                color="#333333"
-                            ),
-                            self._create_spacer(size="md"),
-                            self._create_skill_bar("🎯 投籃", player.shooting_skill),
-                            self._create_spacer(size="sm"),
-                            self._create_skill_bar("🛡️ 防守", player.defense_skill),
-                            self._create_spacer(size="sm"),
-                            self._create_skill_bar("💪 體力", player.stamina),
-                            self._create_spacer(size="md"),
-                            BoxComponent(
-                                layout="baseline",
-                                contents=[
-                                    TextComponent(
-                                        text="⭐ 總體評分：",
-                                        size="sm",
-                                        color="#666666",
-                                        flex=0
-                                    ),
-                                    TextComponent(
-                                        text=f"{player.overall_rating:.1f}/10",
-                                        weight="bold",
-                                        size="md",
-                                        color="#FF6B35",
-                                        align="end"
-                                    )
-                                ]
-                            )
-                        ],
-                        backgroundColor="#F8F9FA",
-                        paddingAll="md",
-                        cornerRadius="8px"
-                    )
-                ]
-            ),
-            footer=BoxComponent(
-                layout="vertical",
-                contents=[
-                    ButtonComponent(
-                        action=PostbackAction(
-                            label="📋 查看所有球員",
-                            data="action=list_players"
-                        ),
-                        style="primary",
-                        color="#4A90E2"
-                    ),
-                    ButtonComponent(
-                        action=PostbackAction(
-                            label="🏀 開始分隊",
-                            data="action=team_help"
-                        ),
-                        style="secondary"
-                    )
-                ],
-                spacing="sm"
-            )
-        )
-        return bubble
+    # 已移除 _create_register_success_flex - 不再使用 Player 類
 
-    def _create_skill_bar(self, skill_name: str, skill_value: int):
-        """創建技能條組件"""
-        # 計算技能條的填充比例
-        filled_bars = skill_value
-        empty_bars = 10 - skill_value
-        skill_bar = "█" * filled_bars + "░" * empty_bars
-        
-        return BoxComponent(
-            layout="baseline",
-            contents=[
-                TextComponent(
-                    text=skill_name,
-                    size="sm",
-                    color="#666666",
-                    flex=0
-                ),
-                self._create_spacer(size="sm"),
-                TextComponent(
-                    text=skill_bar,
-                    size="xs",
-                    color="#FF6B35",
-                    flex=0
-                ),
-                TextComponent(
-                    text=f"{skill_value}",
-                    weight="bold",
-                    size="sm",
-                    color="#333333",
-                    align="end"
-                )
-            ]
-        )
+    # 已移除 _create_skill_bar - 不再使用 Player 類
+    # 已移除所有 Player 相關的 Flex Message 方法
     
-    def _create_player_list_flex(self, players: List[Player]):
-        """創建球員列表 Flex Message"""
-        if not players:
-            return BubbleContainer(
-                body=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(
-                            text="📋 球員列表",
-                            weight="bold",
-                            size="xl",
-                            align="center",
-                            color="#4A90E2"
-                        ),
-                        SeparatorComponent(margin="md"),
-                        self._create_spacer(size="md"),
-                        TextComponent(
-                            text="目前沒有註冊的球員",
-                            align="center",
-                            color="#666666"
-                        ),
-                        self._create_spacer(size="md"),
-                        TextComponent(
-                            text="快來註冊第一位球員吧！",
-                            align="center",
-                            size="sm",
-                            color="#999999"
-                        )
-                    ]
-                ),
-                footer=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        ButtonComponent(
-                            action=PostbackAction(
-                                label="📝 註冊球員",
-                                data="action=register_help"
-                            ),
-                            style="primary",
-                            color="#FF6B35"
-                        )
-                    ]
-                )
-            )
-
-        # 創建球員卡片列表
-        bubbles = []
-        for i, player in enumerate(players[:10]):  # 限制最多顯示10個球員
-            player_bubble = BubbleContainer(
-                body=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(
-                            text=f"👤 {player.name}",
-                            weight="bold",
-                            size="md",
-                            color="#333333"
-                        ),
-                        self._create_spacer(size="sm"),
-                        self._create_mini_skill_display(player),
-                        self._create_spacer(size="sm"),
-                        BoxComponent(
-                            layout="baseline",
-                            contents=[
-                                TextComponent(
-                                    text="總評：",
-                                    size="sm",
-                                    color="#666666",
-                                    flex=0
-                                ),
-                                TextComponent(
-                                    text=f"{player.overall_rating:.1f}/10",
-                                    weight="bold",
-                                    color="#FF6B35",
-                                    align="end"
-                                )
-                            ]
-                        )
-                    ]
-                )
-            )
-            bubbles.append(player_bubble)
-
-        # 添加總結卡片
-        summary_bubble = BubbleContainer(
-            body=BoxComponent(
-                layout="vertical",
-                contents=[
-                    TextComponent(
-                        text="📊 統計資訊",
-                        weight="bold",
-                        size="md",
-                        color="#4A90E2"
-                    ),
-                    SeparatorComponent(margin="sm"),
-                    self._create_spacer(size="sm"),
-                    TextComponent(
-                        text=f"總球員數：{len(players)} 人",
-                        size="sm",
-                        color="#333333"
-                    ),
-                    self._create_spacer(size="xs"),
-                    TextComponent(
-                        text=f"平均評分：{sum(p.overall_rating for p in players)/len(players):.1f}",
-                        size="sm",
-                        color="#666666"
-                    ),
-                    self._create_spacer(size="sm"),
-                    *self._create_team_suggestions(len(players))
-                ]
-            ),
-            footer=BoxComponent(
-                layout="vertical",
-                contents=[
-                    ButtonComponent(
-                        action=PostbackAction(
-                            label="🏀 開始分隊",
-                            data="action=team_help"
-                        ),
-                        style="primary",
-                        color="#4A90E2"
-                    )
-                ]
-            ) if len(players) >= 2 else None
-        )
-        bubbles.append(summary_bubble)
-
-        return CarouselContainer(contents=bubbles)
-
-    def _create_mini_skill_display(self, player: Player):
-        """創建迷你技能顯示"""
-        return BoxComponent(
-            layout="horizontal",
-            contents=[
-                BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(text="🎯", size="xs", align="center"),
-                        TextComponent(text=str(player.shooting_skill), size="xs", align="center", color="#FF6B35")
-                    ],
-                    flex=1
-                ),
-                BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(text="🛡️", size="xs", align="center"),
-                        TextComponent(text=str(player.defense_skill), size="xs", align="center", color="#4A90E2")
-                    ],
-                    flex=1
-                ),
-                BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(text="💪", size="xs", align="center"),
-                        TextComponent(text=str(player.stamina), size="xs", align="center", color="#28A745")
-                    ],
-                    flex=1
-                )
-            ],
-            backgroundColor="#F8F9FA",
-            paddingAll="sm",
-            cornerRadius="8px"
-        )
-
-    def _create_team_suggestions(self, player_count: int):
-        """創建分隊建議"""
-        suggestions = self.team_generator.suggest_optimal_teams(player_count)
-        if not suggestions:
-            return [TextComponent(text="需要更多球員才能分隊", size="xs", color="#999999")]
+    def _is_custom_team_message(self, message_text):
+        """檢查是否為自定義分隊訊息"""
+        import re
         
-        suggestion_texts = []
-        for num_teams, description in suggestions[:2]:  # 只顯示前2個建議
-            suggestion_texts.append(
-                TextComponent(
-                    text=f"• {description}",
-                    size="xs",
-                    color="#666666"
-                )
-            )
-        return suggestion_texts
-    
-    def _create_team_result_flex(self, teams: List[List[Player]]):
-        """創建分隊結果 Flex Message"""
-        if not teams:
-            return BubbleContainer(
-                body=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(
-                            text="❌ 分隊失敗",
-                            weight="bold",
-                            size="xl",
-                            align="center",
-                            color="#DC3545"
-                        ),
-                        self._create_spacer(size="md"),
-                        TextComponent(
-                            text="目前沒有足夠的球員進行分隊",
-                            align="center",
-                            wrap=True,
-                            color="#666666"
-                        )
-                    ]
-                )
-            )
-
-        bubbles = []
-        stats = self.team_generator.get_team_stats(teams)
+        # 檢查是否包含多個成員名稱（以分隔符分隔）
+        # 支援的分隔符：、，,
+        separators = r'[、，,]'
         
-        # 為每個隊伍創建卡片
-        team_colors = ["#FF6B35", "#4A90E2", "#28A745", "#FD7E14", "#6F42C1"]
+        # 移除可能的前綴（如 "日："）
+        clean_text = re.sub(r'^[^：:]*[：:]', '', message_text).strip()
         
-        for i, (team, stat) in enumerate(zip(teams, stats)):
-            color = team_colors[i % len(team_colors)]
+        # 檢查是否包含分隔符且有多個元素
+        if re.search(separators, clean_text):
+            parts = re.split(separators, clean_text)
+            # 過濾掉空字符串和長度小於1的元素
+            valid_parts = [p.strip() for p in parts if p.strip() and len(p.strip()) >= 1]
             
-            team_bubble = BubbleContainer(
-                body=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(
-                            text=f"🔥 第 {i+1} 隊",
-                            weight="bold",
-                            size="lg",
-                            align="center",
-                            color=color
-                        ),
-                        TextComponent(
-                            text=f"平均評分：{stat['avg_rating']:.1f}",
-                            size="sm",
-                            align="center",
-                            color="#666666",
-                            margin="sm"
-                        ),
-                        SeparatorComponent(margin="md"),
-                        self._create_spacer(size="sm"),
-                        *self._create_team_players_list(team),
-                        self._create_spacer(size="md"),
-                        self._create_team_stats_display(stat, color)
-                    ]
-                )
-            )
-            bubbles.append(team_bubble)
+            # 至少需要2個有效成員名稱
+            if len(valid_parts) >= 2:
+                self._log_info(f"[CUSTOM_TEAM] Detected custom team message with {len(valid_parts)} members")
+                return True
         
-        # 添加總結統計卡片
-        if len(stats) >= 2:
-            ratings = [s['avg_rating'] for s in stats if s['player_count'] > 0]
-            balance_score = 10 - (max(ratings) - min(ratings)) if ratings else 0
+        return False
+    
+    def _handle_custom_team_command(self, event, message_text):
+        """處理自定義分隊指令"""
+        import re
+        
+        try:
+            # 解析成員名稱
+            member_names = self._parse_member_names(message_text)
+            if len(member_names) < 2:
+                self._send_message(event.reply_token, "❌ 至少需要 2 位成員才能分隊")
+                return
             
-            summary_bubble = BubbleContainer(
-                body=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(
-                            text="⚖️ 分隊總結",
-                            weight="bold",
-                            size="lg",
-                            align="center",
-                            color="#6F42C1"
-                        ),
-                        SeparatorComponent(margin="md"),
-                        self._create_spacer(size="md"),
-                        BoxComponent(
-                            layout="baseline",
-                            contents=[
-                                TextComponent(
-                                    text="隊伍平衡度：",
-                                    size="sm",
-                                    color="#666666",
-                                    flex=0
-                                ),
-                                TextComponent(
-                                    text=f"{balance_score:.1f}/10",
-                                    weight="bold",
-                                    size="md",
-                                    color="#FF6B35",
-                                    align="end"
-                                )
-                            ]
-                        ),
-                        self._create_spacer(size="sm"),
-                        TextComponent(
-                            text=self._get_balance_comment(balance_score),
-                            size="sm",
-                            wrap=True,
-                            align="center",
-                            color="#666666"
-                        ),
-                        self._create_spacer(size="md"),
-                        TextComponent(
-                            text=f"總共 {sum(len(team) for team in teams)} 位球員",
-                            size="xs",
-                            align="center",
-                            color="#999999"
-                        )
-                    ]
-                ),
-                footer=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        ButtonComponent(
-                            action=PostbackAction(
-                                label="🔄 重新分隊",
-                                data="action=team_help"
-                            ),
-                            style="secondary"
-                        )
-                    ]
-                )
-            )
-            bubbles.append(summary_bubble)
-
-        return CarouselContainer(contents=bubbles)
-
-    def _create_team_players_list(self, team: List[Player]):
-        """創建隊伍球員列表"""
-        if not team:
-            return [TextComponent(text="⚠️ 無球員", size="sm", color="#999999", align="center")]
-        
-        player_components = []
-        for j, player in enumerate(team, 1):
-            player_components.append(
-                BoxComponent(
-                    layout="baseline",
-                    contents=[
-                        TextComponent(
-                            text=f"{j}.",
-                            size="sm",
-                            color="#666666",
-                            flex=0
-                        ),
-                        self._create_spacer(size="sm"),
-                        TextComponent(
-                            text=player.name,
-                            size="sm",
-                            color="#333333",
-                            flex=1
-                        ),
-                        TextComponent(
-                            text=f"{player.overall_rating:.1f}",
-                            weight="bold",
-                            size="sm",
-                            color="#FF6B35",
-                            align="end",
-                            flex=0
-                        )
-                    ],
-                    margin="xs"
-                )
-            )
-        return player_components
-
-    def _create_team_stats_display(self, stat: dict, color: str):
-        """創建隊伍統計顯示"""
-        return BoxComponent(
-            layout="vertical",
-            contents=[
-                TextComponent(
-                    text="📊 技能統計",
-                    weight="bold",
-                    size="sm",
-                    color=color
-                ),
-                self._create_spacer(size="xs"),
-                BoxComponent(
-                    layout="horizontal",
-                    contents=[
-                        BoxComponent(
-                            layout="vertical",
-                            contents=[
-                                TextComponent(text="🎯", size="xs", align="center"),
-                                TextComponent(text=f"{stat['avg_shooting']:.1f}", size="xs", align="center", color="#FF6B35")
-                            ],
-                            flex=1
-                        ),
-                        BoxComponent(
-                            layout="vertical",
-                            contents=[
-                                TextComponent(text="🛡️", size="xs", align="center"),
-                                TextComponent(text=f"{stat['avg_defense']:.1f}", size="xs", align="center", color="#4A90E2")
-                            ],
-                            flex=1
-                        ),
-                        BoxComponent(
-                            layout="vertical",
-                            contents=[
-                                TextComponent(text="💪", size="xs", align="center"),
-                                TextComponent(text=f"{stat['avg_stamina']:.1f}", size="xs", align="center", color="#28A745")
-                            ],
-                            flex=1
-                        )
-                    ],
-                    backgroundColor="#F8F9FA",
-                    paddingAll="sm",
-                    cornerRadius="8px"
-                )
-            ]
-        )
-
-    def _get_balance_comment(self, balance_score: float) -> str:
-        """根據平衡度得分返回評語"""
-        if balance_score >= 9:
-            return "🌟 完美平衡！隊伍實力非常均等"
-        elif balance_score >= 7:
-            return "👍 平衡良好，可以開始比賽了"
-        elif balance_score >= 5:
-            return "⚠️ 略有差距，但還算公平"
-        else:
-            return "🔄 建議重新分隊獲得更好平衡"
-    
-    def _create_profile_flex(self, player: Player):
-        """創建個人資料 Flex Message"""
-        bubble = BubbleContainer(
-            body=BoxComponent(
-                layout="vertical",
-                contents=[
-                    TextComponent(
-                        text="👤 個人資料",
-                        weight="bold",
-                        size="xl",
-                        align="center",
-                        color="#4A90E2"
-                    ),
-                    SeparatorComponent(margin="md"),
-                    self._create_spacer(size="md"),
-                    TextComponent(
-                        text=player.name,
-                        weight="bold",
-                        size="lg",
-                        align="center",
-                        color="#333333"
-                    ),
-                    self._create_spacer(size="lg"),
-                    BoxComponent(
-                        layout="vertical",
-                        contents=[
-                            TextComponent(
-                                text="🏀 技能評估",
-                                weight="bold",
-                                size="md",
-                                color="#FF6B35",
-                                margin="none"
-                            ),
-                            self._create_spacer(size="md"),
-                            self._create_skill_bar("🎯 投籃", player.shooting_skill),
-                            self._create_spacer(size="sm"),
-                            self._create_skill_bar("🛡️ 防守", player.defense_skill),
-                            self._create_spacer(size="sm"),
-                            self._create_skill_bar("💪 體力", player.stamina),
-                            self._create_spacer(size="md"),
-                            SeparatorComponent(),
-                            self._create_spacer(size="md"),
-                            BoxComponent(
-                                layout="baseline",
-                                contents=[
-                                    TextComponent(
-                                        text="⭐ 總體評分",
-                                        weight="bold",
-                                        color="#333333",
-                                        flex=0
-                                    ),
-                                    TextComponent(
-                                        text=f"{player.overall_rating:.1f}/10",
-                                        weight="bold",
-                                        size="lg",
-                                        color="#FF6B35",
-                                        align="end"
-                                    )
-                                ]
-                            ),
-                            self._create_spacer(size="md"),
-                            BoxComponent(
-                                layout="baseline",
-                                contents=[
-                                    TextComponent(
-                                        text="📅 註冊時間",
-                                        size="sm",
-                                        color="#666666",
-                                        flex=0
-                                    ),
-                                    TextComponent(
-                                        text=player.created_at[:10],
-                                        size="sm",
-                                        color="#666666",
-                                        align="end"
-                                    )
-                                ]
-                            )
-                        ],
-                        backgroundColor="#F8F9FA",
-                        paddingAll="md",
-                        cornerRadius="8px"
-                    )
-                ]
-            ),
-            footer=BoxComponent(
-                layout="vertical",
-                contents=[
-                    ButtonComponent(
-                        action=PostbackAction(
-                            label="📋 查看所有球員",
-                            data="action=list_players"
-                        ),
-                        style="secondary"
-                    ),
-                    ButtonComponent(
-                        action=PostbackAction(
-                            label="🏀 開始分隊",
-                            data="action=team_help"
-                        ),
-                        style="primary",
-                        color="#4A90E2"
-                    )
-                ],
-                spacing="sm"
-            )
-        )
-        return bubble
-    
-    # === 群組專用 Flex Message 模板函數 ===
-    
-    def _create_group_player_list_flex(self, players: List[Player], group_id: str):
-        """創建群組成員清單 Flex Message"""
-        if not players:
-            return BubbleContainer(
-                body=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(
-                            text="📋 群組成員清單",
-                            weight="bold",
-                            size="xl",
-                            align="center",
-                            color="#4A90E2"
-                        ),
-                        SeparatorComponent(margin="md"),
-                        self._create_spacer(size="md"),
-                        TextComponent(
-                            text="目前沒有偵測到群組成員",
-                            align="center",
-                            color="#666666"
-                        ),
-                        self._create_spacer(size="md"),
-                        TextComponent(
-                            text="請使用 /sync 同步群組成員",
-                            align="center",
-                            size="sm",
-                            color="#999999"
-                        )
-                    ]
-                )
-            )
-
-        # 創建群組成員卡片列表
-        bubbles = []
-        registered_players = [p for p in players if p.is_registered]
-        member_players = [p for p in players if not p.is_registered]
-        
-        # 顯示註冊球員
-        for i, player in enumerate(registered_players[:5]):
-            player_bubble = BubbleContainer(
-                body=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(
-                            text=f"✅ {player.name}",
-                            weight="bold",
-                            size="md",
-                            color="#28A745"
-                        ),
-                        TextComponent(
-                            text="已註冊球員",
-                            size="sm",
-                            color="#666666",
-                            margin="sm"
-                        ),
-                        self._create_spacer(size="sm"),
-                        self._create_mini_skill_display(player),
-                        self._create_spacer(size="sm"),
-                        BoxComponent(
-                            layout="baseline",
-                            contents=[
-                                TextComponent(
-                                    text="總評：",
-                                    size="sm",
-                                    color="#666666",
-                                    flex=0
-                                ),
-                                TextComponent(
-                                    text=f"{player.overall_rating:.1f}/10",
-                                    weight="bold",
-                                    color="#FF6B35",
-                                    align="end"
-                                )
-                            ]
-                        )
-                    ]
-                )
-            )
-            bubbles.append(player_bubble)
-        
-        # 顯示群組成員
-        for i, player in enumerate(member_players[:5]):
-            player_bubble = BubbleContainer(
-                body=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(
-                            text=f"👤 {player.name}",
-                            weight="bold",
-                            size="md",
-                            color="#4A90E2"
-                        ),
-                        TextComponent(
-                            text="群組成員",
-                            size="sm",
-                            color="#666666",
-                            margin="sm"
-                        ),
-                        self._create_spacer(size="sm"),
-                        self._create_mini_skill_display(player),
-                        self._create_spacer(size="sm"),
-                        TextComponent(
-                            text="使用預設技能值",
-                            size="xs",
-                            color="#999999",
-                            align="center"
-                        )
-                    ]
-                )
-            )
-            bubbles.append(player_bubble)
-
-        # 添加統計總結卡片
-        summary_bubble = BubbleContainer(
-            body=BoxComponent(
-                layout="vertical",
-                contents=[
-                    TextComponent(
-                        text="📊 群組統計",
-                        weight="bold",
-                        size="md",
-                        color="#6F42C1"
-                    ),
-                    SeparatorComponent(margin="sm"),
-                    self._create_spacer(size="sm"),
-                    TextComponent(
-                        text=f"總成員數：{len(players)} 人",
-                        size="sm",
-                        color="#333333"
-                    ),
-                    self._create_spacer(size="xs"),
-                    TextComponent(
-                        text=f"已註冊：{len(registered_players)} 人",
-                        size="sm",
-                        color="#28A745"
-                    ),
-                    self._create_spacer(size="xs"),
-                    TextComponent(
-                        text=f"群組成員：{len(member_players)} 人",
-                        size="sm",
-                        color="#4A90E2"
-                    ),
-                    self._create_spacer(size="sm"),
-                    TextComponent(
-                        text=f"平均評分：{sum(p.overall_rating for p in players)/len(players):.1f}",
-                        size="sm",
-                        color="#666666"
-                    )
-                ]
-            ),
-            footer=BoxComponent(
-                layout="vertical",
-                contents=[
-                    ButtonComponent(
-                        action=PostbackAction(
-                            label="🏀 開始分隊",
-                            data=f"action=group_team&group_id={group_id}"
-                        ),
-                        style="primary",
-                        color="#FF6B35"
-                    )
-                ]
-            ) if len(players) >= 2 else None
-        )
-        bubbles.append(summary_bubble)
-
-        return CarouselContainer(contents=bubbles)
-    
-    def _create_group_team_result_flex(self, teams: List[List[Player]], group_id: str):
-        """創建群組分隊結果 Flex Message"""
-        if not teams:
-            return BubbleContainer(
-                body=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(
-                            text="❌ 群組分隊失敗",
-                            weight="bold",
-                            size="xl",
-                            align="center",
-                            color="#DC3545"
-                        ),
-                        self._create_spacer(size="md"),
-                        TextComponent(
-                            text="目前群組成員不足進行分隊",
-                            align="center",
-                            wrap=True,
-                            color="#666666"
-                        )
-                    ]
-                )
-            )
-
-        bubbles = []
-        stats = self.team_generator.get_team_stats(teams)
-        
-        # 為每個隊伍創建卡片
-        team_colors = ["#FF6B35", "#4A90E2", "#28A745", "#FD7E14", "#6F42C1"]
-        
-        for i, (team, stat) in enumerate(zip(teams, stats)):
-            color = team_colors[i % len(team_colors)]
+            # 通過別名映射創建球員列表
+            players, mapping_info = self._create_players_from_names(member_names)
             
-            team_bubble = BubbleContainer(
-                body=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(
-                            text=f"🏀 群組第 {i+1} 隊",
-                            weight="bold",
-                            size="lg",
-                            align="center",
-                            color=color
-                        ),
-                        TextComponent(
-                            text=f"平均評分：{stat['avg_rating']:.1f}",
-                            size="sm",
-                            align="center",
-                            color="#666666",
-                            margin="sm"
-                        ),
-                        SeparatorComponent(margin="md"),
-                        self._create_spacer(size="sm"),
-                        *self._create_group_team_players_list(team),
-                        self._create_spacer(size="md"),
-                        self._create_team_stats_display(stat, color)
-                    ]
-                )
-            )
-            bubbles.append(team_bubble)
-        
-        # 添加群組分隊總結
-        if len(stats) >= 2:
-            ratings = [s['avg_rating'] for s in stats if s['player_count'] > 0]
-            balance_score = 10 - (max(ratings) - min(ratings)) if ratings else 0
+            if len(players) < 2:
+                self._send_message(event.reply_token, "❌ 無法創建足夠的球員進行分隊")
+                return
             
-            summary_bubble = BubbleContainer(
-                body=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(
-                            text="⚖️ 群組分隊總結",
-                            weight="bold",
-                            size="lg",
-                            align="center",
-                            color="#6F42C1"
-                        ),
-                        SeparatorComponent(margin="md"),
-                        self._create_spacer(size="md"),
-                        BoxComponent(
-                            layout="baseline",
-                            contents=[
-                                TextComponent(
-                                    text="隊伍平衡度：",
-                                    size="sm",
-                                    color="#666666",
-                                    flex=0
-                                ),
-                                TextComponent(
-                                    text=f"{balance_score:.1f}/10",
-                                    weight="bold",
-                                    size="md",
-                                    color="#FF6B35",
-                                    align="end"
-                                )
-                            ]
-                        ),
-                        self._create_spacer(size="sm"),
-                        TextComponent(
-                            text=self._get_balance_comment(balance_score),
-                            size="sm",
-                            wrap=True,
-                            align="center",
-                            color="#666666"
-                        ),
-                        self._create_spacer(size="md"),
-                        TextComponent(
-                            text=f"群組總共 {sum(len(team) for team in teams)} 位成員參與",
-                            size="xs",
-                            align="center",
-                            color="#999999"
-                        )
-                    ]
-                ),
-                footer=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        ButtonComponent(
-                            action=PostbackAction(
-                                label="🔄 重新分隊",
-                                data=f"action=group_reteam&group_id={group_id}"
-                            ),
-                            style="secondary"
-                        )
-                    ]
-                )
-            )
-            bubbles.append(summary_bubble)
-
-        return CarouselContainer(contents=bubbles)
+            # 使用簡單隨機分隊
+            teams = self._generate_simple_teams(players, num_teams=2)
+            
+            # 創建分隊結果訊息
+            result_message = self._create_custom_team_result_message(teams, mapping_info)
+            
+            self._send_message(event.reply_token, result_message)
+            
+        except Exception as e:
+            self._log_error(f"Error in custom team command: {e}")
+            self._send_message(event.reply_token, "❌ 分隊處理失敗，請稍後再試")
     
-    def _create_group_team_players_list(self, team: List[Player]):
-        """創建群組隊伍球員列表"""
-        if not team:
-            return [TextComponent(text="⚠️ 無成員", size="sm", color="#999999", align="center")]
+    def _parse_member_names(self, message_text):
+        """解析訊息中的成員名稱"""
+        import re
         
-        player_components = []
-        for j, player in enumerate(team, 1):
-            status_icon = "✅" if player.is_registered else "👤"
+        # 移除前綴（如 "日："）
+        clean_text = re.sub(r'^[^：:]*[：:]', '', message_text).strip()
+        
+        # 使用多種分隔符分割
+        separators = r'[、，,]'
+        parts = re.split(separators, clean_text)
+        
+        # 清理和過濾
+        member_names = []
+        for part in parts:
+            name = part.strip()
+            if name and len(name) >= 1:  # 最少1個字符
+                member_names.append(name)
+        
+        self._log_info(f"[PARSE] Extracted member names: {member_names}")
+        return member_names
+    
+    def _create_players_from_names(self, member_names):
+        """通過別名映射創建球員列表"""
+        players = []
+        mapping_info = {
+            'identified': [],
+            'strangers': []
+        }
+        stranger_count = 1
+        
+        for name in member_names:
+            # 嘗試通過別名映射查找用戶
+            user_id = self.alias_repo.find_user_by_alias(name)
             
-            player_components.append(
-                BoxComponent(
-                    layout="baseline",
-                    contents=[
-                        TextComponent(
-                            text=f"{j}.",
-                            size="sm",
-                            color="#666666",
-                            flex=0
-                        ),
-                        self._create_spacer(size="sm"),
-                        TextComponent(
-                            text=f"{status_icon} {player.name}",
-                            size="sm",
-                            color="#333333",
-                            flex=1
-                        ),
-                        TextComponent(
-                            text=f"{player.overall_rating:.1f}",
-                            weight="bold",
-                            size="sm",
-                            color="#FF6B35",
-                            align="end",
-                            flex=0
-                        )
-                    ],
-                    margin="xs"
-                )
-            )
-        return player_components
+            if user_id:
+                # 找到已知用戶
+                display_name = user_id  # 使用映射到的用戶ID作為顯示名稱
+                mapping_info['identified'].append({
+                    'input': name,
+                    'mapped': user_id
+                })
+                self._log_info(f"[ALIAS] Mapped '{name}' -> '{user_id}'")
+            else:
+                # 創建路人
+                display_name = f"路人{stranger_count}"
+                user_id = f"STRANGER_{stranger_count}"
+                mapping_info['strangers'].append({
+                    'input': name,
+                    'stranger': display_name
+                })
+                stranger_count += 1
+                self._log_info(f"[STRANGER] Created '{name}' -> '{display_name}'")
+            
+            # 創建簡單的球員字典（不使用 Player 對象）
+            player = {
+                "user_id": user_id,
+                "name": display_name,
+                "input_name": name
+            }
+            players.append(player)
+        
+        self._log_info(f"[PLAYERS] Created {len(players)} players for team generation")
+        return players, mapping_info
+    
+    def _generate_simple_teams(self, players, num_teams=2):
+        """簡單的隨機分隊方法"""
+        if len(players) < num_teams:
+            return [players]  # 如果人數不足，放在一隊
+        
+        # 隨機打亂球員順序
+        shuffled_players = players.copy()
+        random.shuffle(shuffled_players)
+        
+        # 分配到各隊
+        teams = [[] for _ in range(num_teams)]
+        for i, player in enumerate(shuffled_players):
+            team_index = i % num_teams
+            teams[team_index].append(player)
+        
+        self._log_info(f"[TEAMS] Generated {len(teams)} teams with {[len(team) for team in teams]} members each")
+        return teams
+    
+    def _create_custom_team_result_message(self, teams, mapping_info):
+        """創建自定義分隊結果訊息"""
+        message = "🏀 **自定義分隊結果**\n\n"
+        
+        # 顯示成員映射資訊
+        if mapping_info['identified']:
+            message += "✅ **已識別成員：**\n"
+            for item in mapping_info['identified']:
+                message += f"• {item['input']} → {item['mapped']}\n"
+            message += "\n"
+        
+        if mapping_info['strangers']:
+            message += "👤 **新增路人：**\n"
+            for item in mapping_info['strangers']:
+                message += f"• {item['input']} → {item['stranger']}\n"
+            message += "\n"
+        
+        # 顯示分隊結果
+        message += "🏆 **分隊結果：**\n\n"
+        
+        for i, team in enumerate(teams, 1):
+            message += f"**隊伍 {i}** ({len(team)} 人)\n"
+            for j, player in enumerate(team, 1):
+                message += f"{j}. {player['name']}\n"
+            message += "\n"
+        
+        return message
 
 # 測試功能
 if __name__ == "__main__":

@@ -13,10 +13,6 @@ from src.config import Config
 from src.database.mongodb import init_mongodb, get_database
 from src.models.player import Player
 from src.models.mongodb_models import (
-    PlayersRepository,
-    GroupsRepository,
-    GroupMembersRepository,
-    DivisionsRepository,
     AttendancesRepository,
     AliasMapRepository
 )
@@ -37,10 +33,6 @@ init_mongodb()
 db = get_database()
 
 # 初始化 Repositories
-players_repo = PlayersRepository(db)
-groups_repo = GroupsRepository(db)
-group_members_repo = GroupMembersRepository(db)
-divisions_repo = DivisionsRepository(db)
 attendances_repo = AttendancesRepository(db)
 alias_map_repo = AliasMapRepository(db)
 
@@ -217,13 +209,9 @@ message_handler = LineMessageHandler(
     app.logger
 )
 
-# 群組管理器 (傳遞 repositories)
+# 群組管理器 (簡化版本)
 group_manager = GroupManager(
-    line_bot_api,
-    players_repo=players_repo,
-    groups_repo=groups_repo,
-    group_members_repo=group_members_repo,
-    divisions_repo=divisions_repo
+    line_bot_api
 )
 
 @app.route("/")
