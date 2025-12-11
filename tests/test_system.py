@@ -8,7 +8,9 @@
 
 import os
 import sys
-from src.models.player import init_db, Player, PlayerDatabase
+from src.models.player import Player
+from src.models.mongodb_models import PlayersRepository
+from src.database.mongodb import init_mongodb, get_database
 from src.algorithms.team_generator import TeamGenerator
 
 def test_database():
@@ -16,30 +18,38 @@ def test_database():
     print("=== 測試資料庫功能 ===")
     
     # 初始化資料庫
-    init_db()
-    print("✓ 資料庫初始化成功")
+    init_mongodb()
+    print("✓ MongoDB 初始化成功")
+    
+    # 創建 repository
+    db = get_database()
+    players_repo = PlayersRepository(db)
     
     # 測試創建球員
-    test_players = [
-        Player("test1", "Kobe Bryant", 10, 8, 7),
-        Player("test2", "LeBron James", 9, 9, 9),
-        Player("test3", "Stephen Curry", 10, 6, 8),
-        Player("test4", "Kevin Durant", 10, 7, 8),
+    test_players_data = [
+        ("test1", "Kobe Bryant", 10, 8, 7),
+        ("test2", "LeBron James", 9, 9, 9),
+        ("test3", "Stephen Curry", 10, 6, 8),
+        ("test4", "Kevin Durant", 10, 7, 8),
     ]
     
-    for player in test_players:
-        if PlayerDatabase.create_player(player):
-            print(f"✓ 創建球員成功: {player.name}")
+    created_players = []
+    for user_id, name, shooting, defense, stamina in test_players_data:
+        if players_repo.create(user_id, name, shooting, defense, stamina):
+            print(f"✓ 創建球員成功: {name}")
+            created_players.append(Player(user_id, name, shooting, defense, stamina))
         else:
-            print(f"✗ 創建球員失敗: {player.name}")
+            print(f"✗ 創建球員失敗: {name}")
     
     # 測試查詢功能
-    all_players = PlayerDatabase.get_all_players()
+    all_player_docs = players_repo.get_all()
+    all_players = [Player.from_dict(doc) for doc in all_player_docs]
     print(f"✓ 查詢到 {len(all_players)} 位球員")
     
     # 測試個別查詢
-    player = PlayerDatabase.get_player("test1")
-    if player:
+    player_doc = players_repo.get("test1")
+    if player_doc:
+        player = Player.from_dict(player_doc)
         print(f"✓ 個別查詢成功: {player}")
     else:
         print("✗ 個別查詢失敗")

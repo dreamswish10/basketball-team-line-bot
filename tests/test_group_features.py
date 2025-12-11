@@ -17,31 +17,36 @@ def test_database_models():
     print("🧪 測試資料庫模型...")
     
     try:
-        from src.models.player import init_db, Player, Group, GroupMember, PlayerDatabase, GroupDatabase
+        from src.models.player import Player, Group, GroupMember
+        from src.models.mongodb_models import PlayersRepository, GroupsRepository, GroupMembersRepository
+        from src.database.mongodb import init_mongodb, get_database
         
         # 初始化資料庫
-        init_db()
-        print("✅ 資料庫初始化成功")
+        init_mongodb()
+        print("✅ MongoDB 初始化成功")
+        
+        # 創建 repositories
+        db = get_database()
+        players_repo = PlayersRepository(db)
+        groups_repo = GroupsRepository(db)
+        members_repo = GroupMembersRepository(db)
         
         # 測試群組創建
-        test_group = Group("test_group_123", "測試群組")
-        if GroupDatabase.create_group(test_group):
+        if groups_repo.create("test_group_123", "測試群組"):
             print("✅ 群組創建成功")
         
         # 測試群組成員添加
-        test_member = GroupMember("test_group_123", "user123", "測試成員")
-        if GroupDatabase.add_group_member(test_member):
+        if members_repo.add("test_group_123", "user123", "測試成員"):
             print("✅ 群組成員添加成功")
         
         # 測試球員創建（群組來源）
-        test_player = Player("user123", "測試球員", 6, 7, 8, 
-                           source_group="test_group_123", is_registered=False)
-        if PlayerDatabase.create_player(test_player):
+        if players_repo.create("user123", "測試球員", 6, 7, 8, 
+                             source_group_id="test_group_123", is_registered=False):
             print("✅ 群組球員創建成功")
         
         # 測試群組球員查詢
-        group_players = PlayerDatabase.get_group_players("test_group_123")
-        print(f"✅ 查詢到 {len(group_players)} 位群組球員")
+        group_player_docs = players_repo.get_by_group("test_group_123")
+        print(f"✅ 查詢到 {len(group_player_docs)} 位群組球員")
         
         return True
         

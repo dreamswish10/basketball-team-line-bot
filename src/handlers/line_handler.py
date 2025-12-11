@@ -26,7 +26,9 @@ except ImportError:
         except ImportError:
             # SpacerComponent 不可用，我們將使用替代方案
             SpacerComponent = None
-from src.models.player import Player, PlayerDatabase, GroupDatabase
+from src.models.player import Player
+from src.models.mongodb_models import PlayersRepository
+from src.database.mongodb import get_database
 from src.algorithms.team_generator import TeamGenerator
 from src.handlers.group_manager import GroupManager
 
@@ -36,6 +38,9 @@ class LineMessageHandler:
         self.logger = logger
         self.team_generator = TeamGenerator()
         self.group_manager = GroupManager(line_bot_api)
+        # Initialize MongoDB repositories
+        db = get_database()
+        self.players_repo = PlayersRepository(db)
     
     def _create_spacer(self, size="md", margin=None):
         """創建間距組件 - 安全的 SpacerComponent 替代方案"""
@@ -248,7 +253,10 @@ class LineMessageHandler:
                 player = Player(user_id, name, shooting, defense, stamina, 
                               source_group=group_id, is_registered=True)
                 
-                if PlayerDatabase.create_player(player):
+                # Create player using MongoDB repository
+                if self.players_repo.create(player.user_id, player.name, 
+                                          player.shooting_skill, player.defense_skill, 
+                                          player.stamina, group_id, True):
                     register_flex = self._create_register_success_flex(player)
                     self._send_flex_message(event.reply_token, "球員註冊成功", register_flex)
                 else:
@@ -265,13 +273,17 @@ class LineMessageHandler:
     
     def _handle_list_command(self, event):
         """處理球員列表指令"""
-        players = PlayerDatabase.get_all_players()
+        # Get players from MongoDB and convert to Player objects
+        player_docs = self.players_repo.get_all()
+        players = [Player.from_dict(doc) for doc in player_docs]
         list_flex = self._create_player_list_flex(players)
         self._send_flex_message(event.reply_token, "球員列表", list_flex)
     
     def _handle_team_command(self, event, message_text):
         """處理分隊指令"""
-        players = PlayerDatabase.get_all_players()
+        # Get players from MongoDB and convert to Player objects
+        player_docs = self.players_repo.get_all()
+        players = [Player.from_dict(doc) for doc in player_docs]
         
         if len(players) < 2:
             self._send_message(event.reply_token, "❌ 至少需要 2 位球員才能分隊")
@@ -314,7 +326,9 @@ class LineMessageHandler:
     
     def _handle_profile_command(self, event, user_id):
         """處理個人資料查詢指令"""
-        player = PlayerDatabase.get_player(user_id)
+        # Get player from MongoDB and convert to Player object
+        player_doc = self.players_repo.get(user_id)
+        player = Player.from_dict(player_doc) if player_doc else None
         
         if player:
             profile_flex = self._create_profile_flex(player)
@@ -326,7 +340,7 @@ class LineMessageHandler:
     
     def _handle_delete_command(self, event, user_id):
         """處理刪除資料指令"""
-        if PlayerDatabase.delete_player(user_id):
+        if self.players_repo.delete(user_id):
             message = "✅ 您的球員資料已刪除"
         else:
             message = "❌ 刪除失敗或您還沒有註冊"
