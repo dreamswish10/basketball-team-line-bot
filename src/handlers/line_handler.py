@@ -206,6 +206,25 @@ class LineMessageHandler:
                     self._handle_group_team_command(event, "/group_team", group_id)
                 else:
                     self._send_message(event.reply_token, "❌ 無法識別群組資訊")
+            elif data == "action=reteam":
+                # 自定義分隊重新分隊
+                self._send_message(event.reply_token, 
+                    "🔄 如需重新分隊，請重新發送成員名稱訊息\n\n"
+                    "例如：日：🥛、凱、豪")
+            elif data == "action=team_help":
+                # 分隊說明
+                self._send_message(event.reply_token,
+                    "🏀 智能分隊說明\n\n"
+                    "📋 分隊規則：\n"
+                    "• 人數 ≤ 4：不分隊\n"
+                    "• 人數 > 4：智能分配\n"
+                    "• 每隊最多 3 人\n\n"
+                    "🎯 特殊分配：\n"
+                    "• 7人 → 3,2,2 隊\n"
+                    "• 10人 → 3,3,2,2 隊\n\n"
+                    "💡 使用方法：\n"
+                    "直接發送成員名稱，用逗號、頓號分隔\n"
+                    "例如：🥛、凱、豪、金、kin、勇")
             else:
                 self._send_message(event.reply_token, "❓ 未知的操作")
 
@@ -616,24 +635,24 @@ class LineMessageHandler:
         try:
             # 解析成員名稱
             member_names = self._parse_member_names(message_text)
-            if len(member_names) < 2:
-                self._send_message(event.reply_token, "❌ 至少需要 2 位成員才能分隊")
+            if len(member_names) < 1:
+                self._send_message(event.reply_token, "❌ 請至少輸入 1 位成員名稱")
                 return
             
             # 通過別名映射創建球員列表
             players, mapping_info = self._create_players_from_names(member_names)
             
-            if len(players) < 2:
-                self._send_message(event.reply_token, "❌ 無法創建足夠的球員進行分隊")
+            if len(players) < 1:
+                self._send_message(event.reply_token, "❌ 無法創建球員列表")
                 return
             
-            # 使用簡單隨機分隊
-            teams = self._generate_simple_teams(players, num_teams=2)
+            # 使用智能分隊邏輯（自動決定隊伍數量）
+            teams = self._generate_simple_teams(players)
             
-            # 創建分隊結果訊息
-            result_message = self._create_custom_team_result_message(teams, mapping_info)
+            # 創建分隊結果 Flex Message
+            result_flex = self._create_custom_team_result_flex(teams, mapping_info)
             
-            self._send_message(event.reply_token, result_message)
+            self._send_flex_message(event.reply_token, "自定義分隊結果", result_flex)
             
         except Exception as e:
             self._log_error(f"Error in custom team command: {e}")
@@ -704,25 +723,82 @@ class LineMessageHandler:
         return players, mapping_info
     
     def _generate_simple_teams(self, players, num_teams=2):
-        """簡單的隨機分隊方法"""
-        if len(players) < num_teams:
-            return [players]  # 如果人數不足，放在一隊
+        """智能分隊方法：考慮人數限制和隊伍大小"""
+        total_players = len(players)
+        
+        # 人數小於等於4時不分隊
+        if total_players <= 4:
+            self._log_info(f"[TEAMS] {total_players} players <= 4, keeping all in one team")
+            return [players]
+        
+        # 計算最佳隊伍數量和分配方式
+        optimal_teams = self._calculate_optimal_team_distribution(total_players)
         
         # 隨機打亂球員順序
         shuffled_players = players.copy()
         random.shuffle(shuffled_players)
         
-        # 分配到各隊
-        teams = [[] for _ in range(num_teams)]
-        for i, player in enumerate(shuffled_players):
-            team_index = i % num_teams
-            teams[team_index].append(player)
+        # 根據最佳分配創建隊伍
+        teams = []
+        player_index = 0
         
-        self._log_info(f"[TEAMS] Generated {len(teams)} teams with {[len(team) for team in teams]} members each")
+        for team_size in optimal_teams:
+            team = []
+            for _ in range(team_size):
+                if player_index < len(shuffled_players):
+                    team.append(shuffled_players[player_index])
+                    player_index += 1
+            teams.append(team)
+        
+        self._log_info(f"[TEAMS] Generated {len(teams)} teams with sizes {[len(team) for team in teams]} from {total_players} players")
         return teams
+    
+    def _calculate_optimal_team_distribution(self, total_players):
+        """計算最佳隊伍分配方式（每隊最多3人）"""
+        if total_players <= 4:
+            return [total_players]
+        
+        # 基於每隊最多3人的原則計算分配
+        if total_players == 5:
+            return [3, 2]  # 5人: 3,2
+        elif total_players == 6:
+            return [3, 3]  # 6人: 3,3
+        elif total_players == 7:
+            return [3, 2, 2]  # 7人: 3,2,2
+        elif total_players == 8:
+            return [3, 3, 2]  # 8人: 3,3,2
+        elif total_players == 9:
+            return [3, 3, 3]  # 9人: 3,3,3
+        elif total_players == 10:
+            return [3, 3, 2, 2]  # 10人: 3,3,2,2
+        elif total_players == 11:
+            return [3, 3, 3, 2]  # 11人: 3,3,3,2
+        elif total_players == 12:
+            return [3, 3, 3, 3]  # 12人: 3,3,3,3
+        else:
+            # 對於更多人數，優先創建3人隊伍，剩餘的分成2人或3人隊伍
+            teams_of_3 = total_players // 3
+            remaining = total_players % 3
+            
+            distribution = [3] * teams_of_3
+            
+            if remaining == 1:
+                # 如果剩1人，從最後一個3人隊調1人過來組成2人隊
+                if teams_of_3 > 0:
+                    distribution[-1] = 2
+                    distribution.append(2)
+                else:
+                    distribution = [1]
+            elif remaining == 2:
+                # 剩2人直接組成2人隊
+                distribution.append(2)
+            # remaining == 0 時不需要額外處理
+            
+            return distribution
     
     def _create_custom_team_result_message(self, teams, mapping_info):
         """創建自定義分隊結果訊息"""
+        total_players = sum(len(team) for team in teams)
         message = "🏀 **自定義分隊結果**\n\n"
         
         # 顯示成員映射資訊
@@ -738,16 +814,300 @@ class LineMessageHandler:
                 message += f"• {item['input']} → {item['stranger']}\n"
             message += "\n"
         
+        # 顯示分隊邏輯說明
+        if total_players <= 4:
+            message += "ℹ️ **分隊說明：**\n"
+            message += f"• 總人數 {total_players} 人 ≤ 4 人，不進行分隊\n"
+            message += "• 所有成員在同一隊，適合小組活動\n\n"
+        else:
+            message += "ℹ️ **分隊說明：**\n"
+            message += f"• 總人數 {total_players} 人，採用智能分隊\n"
+            message += "• 每隊最多 3 人，確保比賽平衡\n\n"
+        
         # 顯示分隊結果
         message += "🏆 **分隊結果：**\n\n"
         
-        for i, team in enumerate(teams, 1):
-            message += f"**隊伍 {i}** ({len(team)} 人)\n"
+        if len(teams) == 1:
+            # 只有一隊時的特殊顯示
+            team = teams[0]
+            message += f"**全體成員** ({len(team)} 人)\n"
             for j, player in enumerate(team, 1):
                 message += f"{j}. {player['name']}\n"
-            message += "\n"
+        else:
+            # 多隊時的正常顯示
+            for i, team in enumerate(teams, 1):
+                message += f"**隊伍 {i}** ({len(team)} 人)\n"
+                for j, player in enumerate(team, 1):
+                    message += f"{j}. {player['name']}\n"
+                message += "\n"
         
         return message
+    
+    def _create_custom_team_result_flex(self, teams, mapping_info):
+        """創建自定義分隊結果 Flex Message"""
+        total_players = sum(len(team) for team in teams)
+        
+        # 創建主體內容
+        body_contents = [
+            # 標題
+            TextComponent(
+                text="🏀 自定義分隊結果",
+                weight="bold",
+                size="xl",
+                align="center",
+                color="#FF6B35"
+            ),
+            SeparatorComponent(margin="md"),
+            self._create_spacer(size="md")
+        ]
+        
+        # 添加成員映射區塊
+        if mapping_info['identified'] or mapping_info['strangers']:
+            mapping_section = self._create_member_mapping_section(mapping_info)
+            body_contents.extend(mapping_section)
+            body_contents.append(self._create_spacer(size="md"))
+        
+        # 添加分隊說明區塊  
+        info_section = self._create_team_info_section(total_players)
+        body_contents.extend(info_section)
+        body_contents.append(self._create_spacer(size="md"))
+        
+        # 添加分隊結果區塊
+        teams_section = self._create_teams_display_section(teams)
+        body_contents.extend(teams_section)
+        
+        # 創建 Bubble
+        bubble = BubbleContainer(
+            direction="ltr",
+            body=BoxComponent(
+                layout="vertical",
+                contents=body_contents,
+                spacing="sm"
+            ),
+            footer=self._create_team_result_footer()
+        )
+        
+        return bubble
+    
+    def _create_member_mapping_section(self, mapping_info):
+        """創建成員映射區塊"""
+        contents = []
+        
+        if mapping_info['identified']:
+            contents.append(
+                TextComponent(
+                    text="✅ 已識別成員",
+                    weight="bold", 
+                    size="md",
+                    color="#28A745"
+                )
+            )
+            
+            for item in mapping_info['identified']:
+                contents.append(
+                    BoxComponent(
+                        layout="baseline",
+                        contents=[
+                            TextComponent(
+                                text=f"• {item['input']}",
+                                size="sm",
+                                color="#333333",
+                                flex=0
+                            ),
+                            TextComponent(
+                                text="→",
+                                size="sm", 
+                                color="#999999",
+                                flex=0,
+                                margin="sm"
+                            ),
+                            TextComponent(
+                                text=item['mapped'],
+                                size="sm",
+                                color="#28A745",
+                                weight="bold",
+                                margin="sm"
+                            )
+                        ],
+                        margin="xs"
+                    )
+                )
+        
+        if mapping_info['strangers']:
+            if mapping_info['identified']:
+                contents.append(self._create_spacer(size="sm"))
+            
+            contents.append(
+                TextComponent(
+                    text="👤 新增路人",
+                    weight="bold",
+                    size="md", 
+                    color="#6C757D"
+                )
+            )
+            
+            for item in mapping_info['strangers']:
+                contents.append(
+                    BoxComponent(
+                        layout="baseline",
+                        contents=[
+                            TextComponent(
+                                text=f"• {item['input']}",
+                                size="sm",
+                                color="#333333",
+                                flex=0
+                            ),
+                            TextComponent(
+                                text="→", 
+                                size="sm",
+                                color="#999999",
+                                flex=0,
+                                margin="sm"
+                            ),
+                            TextComponent(
+                                text=item['stranger'],
+                                size="sm",
+                                color="#6C757D",
+                                weight="bold",
+                                margin="sm"
+                            )
+                        ],
+                        margin="xs"
+                    )
+                )
+        
+        return contents
+    
+    def _create_team_info_section(self, total_players):
+        """創建分隊說明區塊"""
+        if total_players <= 4:
+            description = f"總人數 {total_players} 人 ≤ 4 人，不進行分隊\n所有成員在同一隊，適合小組活動"
+        else:
+            description = f"總人數 {total_players} 人，採用智能分隊\n每隊最多 3 人，確保比賽平衡"
+        
+        return [
+            BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="ℹ️ 分隊說明",
+                        weight="bold",
+                        size="md",
+                        color="#4A90E2"
+                    ),
+                    TextComponent(
+                        text=description,
+                        size="sm",
+                        wrap=True,
+                        margin="sm",
+                        color="#666666"
+                    )
+                ],
+                backgroundColor="#F8F9FA",
+                paddingAll="md",
+                cornerRadius="8px"
+            )
+        ]
+    
+    def _create_teams_display_section(self, teams):
+        """創建分隊顯示區塊"""
+        contents = [
+            TextComponent(
+                text="🏆 分隊結果",
+                weight="bold",
+                size="lg",
+                color="#FF6B35"
+            ),
+            self._create_spacer(size="sm")
+        ]
+        
+        # 隊伍顏色配置
+        team_colors = ["#007BFF", "#28A745", "#DC3545", "#6F42C1", "#FD7E14", "#20C997"]
+        
+        if len(teams) == 1:
+            # 只有一隊時的特殊顯示
+            team = teams[0]
+            team_card = self._create_team_card("全體成員", team, "#FF6B35")
+            contents.append(team_card)
+        else:
+            # 多隊時的正常顯示
+            for i, team in enumerate(teams):
+                color = team_colors[i % len(team_colors)]
+                team_card = self._create_team_card(f"隊伍 {i+1}", team, color)
+                contents.append(team_card)
+                if i < len(teams) - 1:  # 不是最後一隊
+                    contents.append(self._create_spacer(size="sm"))
+        
+        return contents
+    
+    def _create_team_card(self, team_name, players, color):
+        """創建單個隊伍卡片"""
+        member_texts = []
+        for j, player in enumerate(players, 1):
+            member_texts.append(
+                TextComponent(
+                    text=f"{j}. {player['name']}",
+                    size="sm",
+                    color="#333333"
+                )
+            )
+        
+        return BoxComponent(
+            layout="vertical",
+            contents=[
+                BoxComponent(
+                    layout="baseline",
+                    contents=[
+                        TextComponent(
+                            text=team_name,
+                            weight="bold",
+                            size="md",
+                            color="#FFFFFF",
+                            flex=0
+                        ),
+                        TextComponent(
+                            text=f"({len(players)} 人)",
+                            size="sm",
+                            color="#FFFFFF",
+                            align="end"
+                        )
+                    ]
+                ),
+                self._create_spacer(size="sm"),
+                BoxComponent(
+                    layout="vertical",
+                    contents=member_texts,
+                    spacing="xs"
+                )
+            ],
+            backgroundColor=color,
+            paddingAll="md",
+            cornerRadius="8px"
+        )
+    
+    def _create_team_result_footer(self):
+        """創建分隊結果 Footer"""
+        return BoxComponent(
+            layout="vertical",
+            contents=[
+                ButtonComponent(
+                    action=PostbackAction(
+                        label="🔄 重新分隊",
+                        data="action=reteam"
+                    ),
+                    style="primary",
+                    color="#FF6B35"
+                ),
+                ButtonComponent(
+                    action=PostbackAction(
+                        label="❓ 分隊說明",
+                        data="action=team_help"
+                    ),
+                    style="link"
+                )
+            ],
+            spacing="sm"
+        )
 
 # 測試功能
 if __name__ == "__main__":
