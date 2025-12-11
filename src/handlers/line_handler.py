@@ -921,6 +921,48 @@ class LineMessageHandler:
         
         # 創建 Carousel
         carousel = CarouselContainer(contents=bubbles)
+        
+        # 調試輸出：印出 CarouselContainer 結構
+        try:
+            self._log_info(f"[DEBUG] CarouselContainer type: {type(carousel)}")
+            self._log_info(f"[DEBUG] CarouselContainer contents count: {len(carousel.contents)}")
+            
+            # 嘗試印出每個 bubble 的類型和基本信息
+            for i, bubble in enumerate(carousel.contents):
+                bubble_type = getattr(bubble, 'type', 'unknown')
+                bubble_size = getattr(bubble, 'size', 'default')
+                self._log_info(f"[DEBUG] Bubble {i+1}: type={bubble_type}, size={bubble_size}")
+            
+            # 嘗試印出 carousel 的字典表示（如果有 to_dict 方法）
+            if hasattr(carousel, 'to_dict'):
+                try:
+                    carousel_dict = carousel.to_dict()
+                    self._log_info(f"[DEBUG] CarouselContainer dict keys: {list(carousel_dict.keys())}")
+                    self._log_info(f"[DEBUG] CarouselContainer type in dict: {carousel_dict.get('type', 'not_found')}")
+                except Exception as e:
+                    self._log_warning(f"[DEBUG] Could not convert carousel to dict: {e}")
+            
+            # 嘗試印出 carousel 的 JSON 表示
+            try:
+                import json
+                if hasattr(carousel, '__dict__'):
+                    # 嘗試序列化 carousel 的屬性
+                    carousel_attrs = {}
+                    for attr_name in dir(carousel):
+                        if not attr_name.startswith('_'):
+                            try:
+                                attr_value = getattr(carousel, attr_name)
+                                if not callable(attr_value):
+                                    carousel_attrs[attr_name] = str(attr_value)
+                            except:
+                                pass
+                    self._log_info(f"[DEBUG] CarouselContainer attributes: {carousel_attrs}")
+            except Exception as e:
+                self._log_warning(f"[DEBUG] Could not analyze carousel attributes: {e}")
+                
+        except Exception as debug_error:
+            self._log_error(f"[DEBUG] Error in carousel debugging: {debug_error}")
+        
         return carousel
     
     def _create_nano_team_bubble(self, team, team_number, color):
@@ -947,7 +989,7 @@ class LineMessageHandler:
                         margin="lg"
                     )
                 ],
-                backgroundColor=color,
+                backgroundColor="#cd2c2c",
                 paddingTop="19px",
                 paddingAll="12px",
                 paddingBottom="16px"
