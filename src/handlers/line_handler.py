@@ -989,7 +989,7 @@ class LineMessageHandler:
                         margin="lg"
                     )
                 ],
-                backgroundColor="#cd2c2c",
+                color=color,
                 paddingTop="19px",
                 paddingAll="12px",
                 paddingBottom="16px"
