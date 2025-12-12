@@ -147,6 +147,9 @@ class LineMessageHandler:
             elif message_text.startswith('/delete') or message_text == '刪除資料':
                 self._log_info(f"[COMMAND] Matched: /delete, User: {user_id}")
                 self._handle_delete_command(event, user_id)
+            elif message_text.startswith('/test-fullbox') or message_text == '填滿測試':
+                self._log_info(f"[COMMAND] Matched: /test-fullbox, User: {user_id}")
+                self._handle_test_fullbox_command(event)
             elif message_text.startswith('/test-position') or message_text == '位置測試':
                 self._log_info(f"[COMMAND] Matched: /test-position, User: {user_id}")
                 self._handle_test_position_command(event)
@@ -445,6 +448,30 @@ class LineMessageHandler:
         except Exception as e:
             self._log_error(f"❌ 發送位置測試失敗: {e}")
             self._send_message(event.reply_token, f"❌ 位置測試失敗: {str(e)}")
+    
+    def _handle_test_fullbox_command(self, event):
+        """處理填滿測試指令 - 測試用整個box填滿bubble營造背景色"""
+        self._log_info("=== 發送填滿Box背景色測試 ===")
+        
+        # 創建3個不同的填滿box方案
+        test_bubbles = [
+            self._create_fullbox_absolute(),    # 絕對定位填滿
+            self._create_fullbox_percentage(),  # 100%尺寸填滿
+            self._create_fullbox_gradient()     # 線性漸層填滿
+        ]
+        
+        # 發送測試 carousel
+        from linebot.models import FlexSendMessage, CarouselContainer
+        
+        carousel = CarouselContainer(contents=test_bubbles)
+        flex_message = FlexSendMessage(alt_text="填滿Box背景色測試", contents=carousel)
+        
+        try:
+            self.line_bot_api.reply_message(event.reply_token, flex_message)
+            self._log_info("✅ 填滿測試已發送")
+        except Exception as e:
+            self._log_error(f"❌ 發送填滿測試失敗: {e}")
+            self._send_message(event.reply_token, f"❌ 填滿測試失敗: {str(e)}")
     
     def _create_test_bubble_1(self):
         """測試 Bubble 1: nano 大小，header 紅色背景"""
@@ -802,6 +829,133 @@ class LineMessageHandler:
                     )
                 ],
                 backgroundColor="#A17DF5",  # footer 紫色背景
+                paddingAll="16px"
+            )
+        )
+    
+    def _create_fullbox_absolute(self):
+        """填滿測試1: 絕對定位填滿整個bubble"""
+        from linebot.models import BubbleContainer, BoxComponent, TextComponent
+        
+        self._log_info("創建填滿測試1 - 絕對定位填滿 #FF6B35")
+        
+        return BubbleContainer(
+            size="nano",
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    # 背景 box - 絕對定位填滿整個區域
+                    BoxComponent(
+                        layout="vertical",
+                        contents=[],  # 空內容，只用作背景
+                        position="absolute",
+                        offsetTop="0px",
+                        offsetBottom="0px",
+                        offsetStart="0px", 
+                        offsetEnd="0px",
+                        backgroundColor="#FF6B35"  # 橙色背景
+                    ),
+                    # 內容 box - 相對定位在背景之上
+                    BoxComponent(
+                        layout="vertical",
+                        contents=[
+                            TextComponent(
+                                text="絕對定位",
+                                color="#ffffff",
+                                weight="bold",
+                                align="center",
+                                size="md"
+                            ),
+                            TextComponent(
+                                text="填滿背景",
+                                color="#ffffff",
+                                align="center",
+                                size="sm",
+                                margin="sm"
+                            )
+                        ],
+                        position="relative",
+                        paddingAll="16px"
+                    )
+                ]
+            )
+        )
+    
+    def _create_fullbox_percentage(self):
+        """填滿測試2: 100%尺寸填滿bubble"""
+        from linebot.models import BubbleContainer, BoxComponent, TextComponent
+        
+        self._log_info("創建填滿測試2 - 100%尺寸填滿 #4ECDC4")
+        
+        return BubbleContainer(
+            size="nano",
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    # 背景 box - 100% 寬度和高度
+                    BoxComponent(
+                        layout="vertical",
+                        contents=[
+                            TextComponent(
+                                text="100%尺寸",
+                                color="#ffffff",
+                                weight="bold",
+                                align="center",
+                                size="md"
+                            ),
+                            TextComponent(
+                                text="填滿背景",
+                                color="#ffffff",
+                                align="center",
+                                size="sm",
+                                margin="sm"
+                            )
+                        ],
+                        width="100%",
+                        height="100%",
+                        backgroundColor="#4ECDC4",  # 青色背景
+                        paddingAll="16px"
+                    )
+                ],
+                paddingAll="0px"  # 移除外層padding讓內部box完全填滿
+            )
+        )
+    
+    def _create_fullbox_gradient(self):
+        """填滿測試3: 線性漸層作為背景填滿"""
+        from linebot.models import BubbleContainer, BoxComponent, TextComponent
+        
+        self._log_info("創建填滿測試3 - 線性漸層填滿 #A17DF5")
+        
+        # 創建線性漸層背景
+        gradient_background = {
+            "type": "linearGradient",
+            "angle": "0deg",
+            "startColor": "#A17DF5",  # 紫色
+            "endColor": "#A17DF5"     # 同色創造純色效果
+        }
+        
+        return BubbleContainer(
+            size="nano", 
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="線性漸層",
+                        color="#ffffff",
+                        weight="bold",
+                        align="center",
+                        size="md"
+                    ),
+                    TextComponent(
+                        text="背景填滿",
+                        color="#ffffff",
+                        align="center",
+                        size="sm",
+                        margin="sm"
+                    )
+                ],
+                background=gradient_background,  # 使用漸層背景
                 paddingAll="16px"
             )
         )
