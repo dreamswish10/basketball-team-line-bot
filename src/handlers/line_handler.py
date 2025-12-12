@@ -1622,87 +1622,37 @@ class LineMessageHandler:
         )
     
     def _create_info_nano_bubble(self, mapping_info, team_count):
-        """創建資訊 nano bubble"""
-        # 計算已識別和路人的數量
-        identified_count = len(mapping_info.get('identified', []))
-        strangers_count = len(mapping_info.get('strangers', []))
-        total_count = identified_count + strangers_count
+        """創建資訊 nano bubble - 簡潔的白底黑字設計"""
+        from datetime import datetime
         
-        # 創建進度條效果
-        identified_percentage = int((identified_count / total_count * 100)) if total_count > 0 else 0
-        
-        # 添加調試日誌
-        self._log_info(f"[DEBUG] Creating info nano bubble with backgroundColor: #4ECDC4")
+        # 獲取當前月日
+        now = datetime.now()
+        date_str = f"{now.month}/{now.day}"
         
         return BubbleContainer(
             size="nano",
-            header=BoxComponent(
-                layout="vertical",
-                contents=[
-                    TextComponent(
-                        text="分隊資訊",
-                        color="#ffffff",
-                        align="start",
-                        size="md",
-                        gravity="center",
-                        weight="bold"
-                    ),
-                    TextComponent(
-                        text=f"已識別 {identified_percentage}%",
-                        color="#ffffff",
-                        align="start",
-                        size="xs",
-                        gravity="center",
-                        margin="lg"
-                    ),
-                    BoxComponent(
-                        layout="vertical",
-                        contents=[
-                            BoxComponent(
-                                layout="vertical",
-                                contents=[
-                                    # 使用 filler 需要特殊處理，這裡改用 text
-                                    TextComponent(text=" ", size="xxs")
-                                ],
-                                width=f"{identified_percentage}%",
-                                background=self._create_gradient_background("#0D8186"),
-                                height="6px"
-                            )
-                        ],
-                        background=self._create_gradient_background("#9FD8E36E"),
-                        height="6px",
-                        margin="sm"
-                    )
-                ],
-                background=self._create_gradient_background("#4ECDC4"),
-                paddingTop="19px",
-                paddingAll="12px",
-                paddingBottom="16px"
-            ),
             body=BoxComponent(
                 layout="vertical",
                 contents=[
-                    BoxComponent(
-                        layout="horizontal",
-                        contents=[
-                            TextComponent(
-                                text=f"共分成 {team_count} 隊\n已識別 {identified_count} 人，新增 {strangers_count} 人",
-                                color="#8C8C8C",
-                                size="sm",
-                                wrap=True
-                            )
-                        ],
-                        flex=1
+                    TextComponent(
+                        text=date_str,
+                        color="#333333",
+                        align="center",
+                        size="lg",
+                        weight="bold",
+                        margin="md"
+                    ),
+                    TextComponent(
+                        text=f"共分成 {team_count} 隊",
+                        color="#333333",
+                        align="center",
+                        size="sm",
+                        margin="sm"
                     )
                 ],
-                spacing="md",
-                paddingAll="12px"
-            ),
-            styles={
-                "footer": {
-                    "separator": False
-                }
-            }
+                spacing="sm",
+                paddingAll="16px"
+            )
         )
     
     def _create_simple_team_bubble(self, team, mapping_info):
