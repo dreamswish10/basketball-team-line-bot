@@ -927,14 +927,14 @@ class LineMessageHandler:
     def _create_nano_team_bubble(self, team, team_number, color):
         """創建 nano 尺寸的隊伍 Bubble"""
         # 添加調試日誌
-        self._log_info(f"[DEBUG] Creating nano bubble for team {team_number} with color: {color}")
+        self._log_info(f"[DEBUG] Creating nano bubble for team {team_number} with body backgroundColor: {color}")
         
         # 測試不同的背景色設定方法
         try:
             # 方法1：確認顏色格式
             if not color.startswith('#'):
                 color = f"#{color}"
-            self._log_info(f"[DEBUG] Formatted color: {color}")
+            self._log_info(f"[DEBUG] Formatted color for body background: {color}")
         except Exception as e:
             self._log_error(f"[DEBUG] Error formatting color: {e}")
         
@@ -945,7 +945,7 @@ class LineMessageHandler:
                 contents=[
                     TextComponent(
                         text=f"隊伍 {team_number}",
-                        color="#ffffff",
+                        color="#333333",
                         align="start",
                         size="md",
                         gravity="center",
@@ -953,14 +953,13 @@ class LineMessageHandler:
                     ),
                     TextComponent(
                         text=f"{len(team)} 人",
-                        color="#ffffff",
+                        color="#666666",
                         align="start",
                         size="xs",
                         gravity="center",
                         margin="lg"
                     )
                 ],
-                backgroundColor=color,
                 paddingTop="19px",
                 paddingAll="12px",
                 paddingBottom="16px"
@@ -973,7 +972,7 @@ class LineMessageHandler:
                         contents=[
                             TextComponent(
                                 text=self._format_team_members(team),
-                                color="#8C8C8C",
+                                color="#ffffff",
                                 size="sm",
                                 wrap=True
                             )
@@ -981,15 +980,15 @@ class LineMessageHandler:
                         flex=1
                     )
                 ],
+                backgroundColor=color,
                 spacing="md",
                 paddingAll="12px"
-            )
-            # 暫時移除 styles 設定來測試背景色是否有影響
-            # styles={
-            #     "footer": {
-            #         "separator": False
-            #     }
-            # }
+            ),
+            styles={
+                "footer": {
+                    "separator": False
+                }
+            }
         )
     
     def _create_info_nano_bubble(self, mapping_info, team_count):
