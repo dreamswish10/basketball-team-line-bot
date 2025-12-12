@@ -181,6 +181,9 @@ class LineMessageHandler:
             elif message_text.startswith('/分隊') or message_text.startswith('分隊'):
                 self._log_info(f"[COMMAND] Matched: /分隊, User: {user_id}")
                 self._handle_custom_team_command(event, message_text)
+            elif message_text.startswith('/查詢') or message_text.startswith('/query') or message_text == '查詢' or message_text == 'query':
+                self._log_info(f"[COMMAND] Matched: /查詢, User: {user_id}")
+                self._handle_query_command(event, user_id)
             else:
                 self._log_warning(f"[UNKNOWN] Command not recognized: '{message_text}', User: {user_id}")
                 self._handle_unknown_command(event, is_group)
@@ -1338,6 +1341,36 @@ class LineMessageHandler:
             self._log_error(f"Error in custom team command: {e}")
             self._send_message(event.reply_token, "❌ 分隊處理失敗，請稍後再試")
     
+    def _handle_query_command(self, event, user_id):
+        """處理查詢指令，顯示用戶近五次組隊記錄"""
+        try:
+            # 查詢用戶近五次出席記錄
+            attendances = self.attendances_repo.get_user_attendances(user_id, limit=5)
+            
+            if not attendances:
+                self._send_message(event.reply_token, 
+                    "📋 查無組隊記錄\n\n"
+                    "你還沒有參與過任何分隊活動。\n"
+                    "開始使用 /分隊 來參與組隊吧！")
+                return
+            
+            # 格式化出席資料
+            formatted_data = self._format_user_attendance_data(attendances, user_id)
+            
+            if not formatted_data:
+                self._send_message(event.reply_token, "❌ 資料處理失敗，請稍後再試")
+                return
+            
+            # 創建查詢結果 Flex Message
+            query_flex = self._create_attendance_query_flex(formatted_data)
+            
+            # 發送結果
+            self._send_flex_message(event.reply_token, "📋 近五次組隊記錄", query_flex)
+            
+        except Exception as e:
+            self._log_error(f"Error in query command: {e}")
+            self._send_message(event.reply_token, "❌ 查詢失敗，請稍後再試")
+    
     def _is_valid_team_content(self, text):
         """檢查文字是否包含有效的成員名單格式"""
         import re
@@ -1702,6 +1735,189 @@ class LineMessageHandler:
         except Exception as e:
             self._log_error(f"[DB_STORE] Error storing team result: {e}")
             return False
+    
+    def _format_user_attendance_data(self, attendances, user_id):
+        """格式化用戶出席資料為顯示格式"""
+        try:
+            formatted_records = []
+            
+            for attendance in attendances:
+                date = attendance.get('date', 'Unknown')
+                teams = attendance.get('teams', [])
+                
+                # 找出用戶所在的隊伍
+                user_team_id = None
+                user_team_index = None
+                
+                for i, team in enumerate(teams):
+                    members = team.get('members', [])
+                    for member in members:
+                        if member.get('userId') == user_id:
+                            user_team_id = team.get('teamId')
+                            user_team_index = i + 1
+                            break
+                    if user_team_id:
+                        break
+                
+                if not user_team_id:
+                    # 如果找不到用戶在哪一隊，跳過這筆記錄
+                    continue
+                
+                # 格式化日期顯示 (YYYY-MM-DD -> MM/DD)
+                try:
+                    from datetime import datetime
+                    date_obj = datetime.strptime(date, '%Y-%m-%d')
+                    display_date = f"{date_obj.month}/{date_obj.day}"
+                except:
+                    display_date = date
+                
+                # 建立完整陣容資訊
+                team_lineups = []
+                for i, team in enumerate(teams, 1):
+                    members = team.get('members', [])
+                    member_names = []
+                    
+                    for member in members:
+                        name = member.get('name', 'Unknown')
+                        # 如果是當前用戶，標示為【你】
+                        if member.get('userId') == user_id:
+                            name = f"【你】"
+                        member_names.append(name)
+                    
+                    team_lineup = f"第{i}隊：" + "、".join(member_names)
+                    team_lineups.append(team_lineup)
+                
+                record = {
+                    'date': date,
+                    'display_date': display_date,
+                    'user_team_index': user_team_index,
+                    'total_teams': len(teams),
+                    'team_lineups': team_lineups
+                }
+                
+                formatted_records.append(record)
+            
+            self._log_info(f"[QUERY] Formatted {len(formatted_records)} attendance records for user {user_id}")
+            return formatted_records
+            
+        except Exception as e:
+            self._log_error(f"[QUERY] Error formatting attendance data: {e}")
+            return []
+    
+    def _create_attendance_query_flex(self, formatted_records):
+        """創建查詢結果的 Flex Message"""
+        try:
+            if len(formatted_records) == 1:
+                # 只有一筆記錄，直接使用 BubbleContainer
+                return self._create_single_attendance_bubble(formatted_records[0])
+            else:
+                # 多筆記錄，使用 CarouselContainer
+                bubbles = []
+                for record in formatted_records:
+                    bubble = self._create_single_attendance_bubble(record)
+                    bubbles.append(bubble)
+                
+                return CarouselContainer(contents=bubbles)
+        
+        except Exception as e:
+            self._log_error(f"[QUERY] Error creating attendance query flex: {e}")
+            # Fallback: 簡單文字顯示
+            return BubbleContainer(
+                body=BoxComponent(
+                    layout="vertical",
+                    contents=[
+                        TextComponent(
+                            text="❌ 顯示格式錯誤",
+                            size="lg",
+                            weight="bold",
+                            color="#FF6B35"
+                        )
+                    ]
+                )
+            )
+    
+    def _create_single_attendance_bubble(self, record):
+        """創建單一出席記錄的 bubble"""
+        try:
+            display_date = record.get('display_date', 'Unknown')
+            user_team_index = record.get('user_team_index', 1)
+            total_teams = record.get('total_teams', 1)
+            team_lineups = record.get('team_lineups', [])
+            
+            # Header: 日期 + 用戶隊伍資訊
+            header_text = f"{display_date} - 第{user_team_index}隊"
+            
+            # Body: 完整陣容列表
+            body_contents = []
+            
+            # 添加陣容標題
+            body_contents.append(
+                TextComponent(
+                    text=f"當日組隊陣容 (共{total_teams}隊)",
+                    size="sm",
+                    color="#8C8C8C",
+                    margin="none"
+                )
+            )
+            
+            # 添加分隔線
+            body_contents.append(SeparatorComponent(margin="sm"))
+            
+            # 添加每隊陣容
+            for i, lineup in enumerate(team_lineups):
+                # 判斷是否為用戶所在隊伍
+                is_user_team = (i + 1) == user_team_index
+                text_color = "#333333" if not is_user_team else "#0099CC"
+                text_weight = "regular" if not is_user_team else "bold"
+                
+                body_contents.append(
+                    TextComponent(
+                        text=lineup,
+                        size="sm",
+                        color=text_color,
+                        weight=text_weight,
+                        wrap=True,
+                        margin="sm"
+                    )
+                )
+            
+            return BubbleContainer(
+                size="nano",
+                header=BoxComponent(
+                    layout="vertical",
+                    contents=[
+                        TextComponent(
+                            text=header_text,
+                            color="#ffffff",
+                            align="center",
+                            size="md",
+                            weight="bold"
+                        )
+                    ],
+                    background=self._create_gradient_background("#4A90E2"),
+                    paddingAll="12px"
+                ),
+                body=BoxComponent(
+                    layout="vertical",
+                    contents=body_contents,
+                    spacing="xs",
+                    paddingAll="12px"
+                )
+            )
+            
+        except Exception as e:
+            self._log_error(f"[QUERY] Error creating single attendance bubble: {e}")
+            return BubbleContainer(
+                body=BoxComponent(
+                    layout="vertical",
+                    contents=[
+                        TextComponent(
+                            text="❌ 記錄顯示錯誤",
+                            color="#FF6B35"
+                        )
+                    ]
+                )
+            )
     
     def _create_simple_team_bubble(self, team, mapping_info):
         """為 ≤4 人創建簡單 bubble"""
