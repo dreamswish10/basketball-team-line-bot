@@ -911,6 +911,7 @@ class LineMessageHandler:
         # 為每個隊伍創建 nano bubble
         for i, team in enumerate(teams):
             color = team_colors[i % len(team_colors)]
+            self._log_info(f"[DEBUG] Team {i+1}: Selected color = {color} from index {i % len(team_colors)}")
             team_bubble = self._create_nano_team_bubble(team, i + 1, color)
             bubbles.append(team_bubble)
         
@@ -925,6 +926,18 @@ class LineMessageHandler:
     
     def _create_nano_team_bubble(self, team, team_number, color):
         """創建 nano 尺寸的隊伍 Bubble"""
+        # 添加調試日誌
+        self._log_info(f"[DEBUG] Creating nano bubble for team {team_number} with color: {color}")
+        
+        # 測試不同的背景色設定方法
+        try:
+            # 方法1：確認顏色格式
+            if not color.startswith('#'):
+                color = f"#{color}"
+            self._log_info(f"[DEBUG] Formatted color: {color}")
+        except Exception as e:
+            self._log_error(f"[DEBUG] Error formatting color: {e}")
+        
         return BubbleContainer(
             size="nano",
             header=BoxComponent(
@@ -932,7 +945,7 @@ class LineMessageHandler:
                 contents=[
                     TextComponent(
                         text=f"隊伍 {team_number}",
-                        color="#090808",
+                        color="#ffffff",
                         align="start",
                         size="md",
                         gravity="center",
@@ -940,7 +953,7 @@ class LineMessageHandler:
                     ),
                     TextComponent(
                         text=f"{len(team)} 人",
-                        color="#0f0e0e",
+                        color="#ffffff",
                         align="start",
                         size="xs",
                         gravity="center",
@@ -970,12 +983,13 @@ class LineMessageHandler:
                 ],
                 spacing="md",
                 paddingAll="12px"
-            ),
-            styles={
-                "footer": {
-                    "separator": False
-                }
-            }
+            )
+            # 暫時移除 styles 設定來測試背景色是否有影響
+            # styles={
+            #     "footer": {
+            #         "separator": False
+            #     }
+            # }
         )
     
     def _create_info_nano_bubble(self, mapping_info, team_count):
@@ -987,6 +1001,9 @@ class LineMessageHandler:
         
         # 創建進度條效果
         identified_percentage = int((identified_count / total_count * 100)) if total_count > 0 else 0
+        
+        # 添加調試日誌
+        self._log_info(f"[DEBUG] Creating info nano bubble with backgroundColor: #4ECDC4")
         
         return BubbleContainer(
             size="nano",
