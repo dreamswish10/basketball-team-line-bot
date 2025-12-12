@@ -1575,7 +1575,7 @@ class LineMessageHandler:
                 contents=[
                     TextComponent(
                         text=f"隊伍 {team_number}",
-                        color="#333333",
+                        color="#ffffff",
                         align="start",
                         size="md",
                         gravity="center",
@@ -1583,13 +1583,14 @@ class LineMessageHandler:
                     ),
                     TextComponent(
                         text=f"{len(team)} 人",
-                        color="#666666",
+                        color="#ffffff",
                         align="start",
                         size="xs",
                         gravity="center",
                         margin="lg"
                     )
                 ],
+                background=self._create_gradient_background(color),
                 paddingTop="19px",
                 paddingAll="12px",
                 paddingBottom="16px"
@@ -1602,7 +1603,7 @@ class LineMessageHandler:
                         contents=[
                             TextComponent(
                                 text=self._format_team_members(team),
-                                color="#ffffff",
+                                color="#333333",
                                 size="sm",
                                 wrap=True
                             )
@@ -1610,7 +1611,6 @@ class LineMessageHandler:
                         flex=1
                     )
                 ],
-                background=self._create_gradient_background(color),
                 spacing="md",
                 paddingAll="12px"
             ),
