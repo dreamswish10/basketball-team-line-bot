@@ -1789,7 +1789,7 @@ class LineMessageHandler:
                             name = f"【{name}】"
                         member_names.append(name)
                     
-                    team_lineup = f"第{i}隊：" + "、".join(member_names)
+                    team_lineup = f"、".join(member_names)
                     team_lineups.append(team_lineup)
                 
                 record = {
