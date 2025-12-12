@@ -26,7 +26,7 @@ except ImportError:
         except ImportError:
             # SpacerComponent 不可用，我們將使用替代方案
             SpacerComponent = None
-from src.models.mongodb_models import AliasMapRepository
+from src.models.mongodb_models import AliasMapRepository, AttendancesRepository
 from src.database.mongodb import get_database
 import random
 
@@ -42,6 +42,7 @@ class LineMessageHandler:
         # Initialize MongoDB repositories
         db = get_database()
         self.alias_repo = AliasMapRepository(db)
+        self.attendances_repo = AttendancesRepository(db)
     
     def _create_gradient_background(self, color, angle="0deg"):
         """創建線性漸層背景 - 解決 backgroundColor 不顯示的問題"""
@@ -1026,8 +1027,12 @@ class LineMessageHandler:
                     f"❌ 隊伍數量 ({num_teams}) 不能超過成員數量 ({len(players)})")
                 return
             
-            # 生成隊伍
-            teams = self.team_generator.generate_teams(players, num_teams)
+            # 生成隊伍 (使用智能分隊邏輯)
+            teams = self._generate_simple_teams(players, num_teams)
+            
+            # 儲存分隊結果到資料庫
+            self._store_team_result(teams, context="group")
+            
             team_flex = self._create_group_team_result_flex(teams, group_id)
             self._send_flex_message(event.reply_token, "群組分隊結果", team_flex)
             
@@ -1320,6 +1325,9 @@ class LineMessageHandler:
             
             # 使用智能分隊邏輯（自動決定隊伍數量）
             teams = self._generate_simple_teams(players)
+            
+            # 儲存分隊結果到資料庫
+            self._store_team_result(teams, context="custom")
             
             # 創建分隊結果 Flex Message
             result_flex = self._create_custom_team_result_flex(teams, mapping_info)
@@ -1654,6 +1662,46 @@ class LineMessageHandler:
                 paddingAll="16px"
             )
         )
+    
+    def _store_team_result(self, teams, context="custom"):
+        """儲存分隊結果到資料庫"""
+        try:
+            from datetime import datetime
+            
+            # 獲取當前日期作為key
+            current_date = datetime.now().strftime("%Y-%m-%d")
+            
+            # 轉換團隊格式為 AttendancesRepository 需要的格式
+            formatted_teams = []
+            for i, team in enumerate(teams, 1):
+                team_data = {
+                    "teamId": f"team_{i}",
+                    "members": []
+                }
+                
+                for player in team:
+                    member = {
+                        "userId": player.get("user_id", f"unknown_{i}"),
+                        "name": player.get("name", "Unknown")
+                    }
+                    team_data["members"].append(member)
+                
+                formatted_teams.append(team_data)
+            
+            # 儲存到資料庫
+            success = self.attendances_repo.create_or_update_attendance(current_date, formatted_teams)
+            
+            if success:
+                total_players = sum(len(team) for team in teams)
+                self._log_info(f"[DB_STORE] Successfully stored {len(formatted_teams)} teams with {total_players} players for {current_date}")
+            else:
+                self._log_warning(f"[DB_STORE] Failed to store team data for {current_date}")
+            
+            return success
+            
+        except Exception as e:
+            self._log_error(f"[DB_STORE] Error storing team result: {e}")
+            return False
     
     def _create_simple_team_bubble(self, team, mapping_info):
         """為 ≤4 人創建簡單 bubble"""
