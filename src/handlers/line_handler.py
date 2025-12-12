@@ -995,7 +995,7 @@ class LineMessageHandler:
                 contents=[
                     TextComponent(
                         text="分隊資訊",
-                        color="#ffffff",
+                        color="#090808",
                         align="start",
                         size="md",
                         gravity="center",
@@ -1003,7 +1003,7 @@ class LineMessageHandler:
                     ),
                     TextComponent(
                         text=f"已識別 {identified_percentage}%",
-                        color="#ffffff",
+                        color="#121010",
                         align="start",
                         size="xs",
                         gravity="center",
