@@ -505,7 +505,7 @@ class LineMessageHandler:
                         size="xs"  # 調整為 nano bubble 適當大小
                     )
                 ],
-                backgroundColor="#FF0000",  # 紅色背景
+                background=self._create_gradient_background("#FF0000"),  # 紅色背景
                 paddingAll="12px"  # nano bubble 使用較小 padding
             ),
             body=BoxComponent(
@@ -540,7 +540,7 @@ class LineMessageHandler:
                         size="md"
                     )
                 ],
-                backgroundColor="#0066FF",  # 藍色背景
+                background=self._create_gradient_background("#0066FF"),  # 藍色背景
                 paddingAll="12px"
             ),
             body=BoxComponent(
@@ -575,7 +575,7 @@ class LineMessageHandler:
                         size="md"
                     )
                 ],
-                backgroundColor="#666666",  # 灰色背景  
+                background=self._create_gradient_background("#666666"),  # 灰色背景  
                 paddingAll="12px"
             ),
             body=BoxComponent(
@@ -588,7 +588,7 @@ class LineMessageHandler:
                         wrap=True
                     )
                 ],
-                backgroundColor="#00AA00",  # 綠色背景在 body
+                background=self._create_gradient_background("#00AA00"),  # 綠色背景在 body
                 paddingAll="12px"
             )
         )
@@ -623,7 +623,7 @@ class LineMessageHandler:
                         margin="sm"
                     )
                 ],
-                backgroundColor="#FF6B35",  # 橙色背景
+                background=self._create_gradient_background("#FF6B35"),  # 橙色背景
                 paddingAll="20px"
             ),
             body=BoxComponent(
@@ -676,7 +676,7 @@ class LineMessageHandler:
                         weight="bold"
                     )
                 ],
-                backgroundColor="#FF0000",  # 大寫hex紅色
+                background=self._create_gradient_background("#FF0000"),  # 大寫hex紅色
                 paddingAll="20px"
             )
         )
@@ -698,7 +698,7 @@ class LineMessageHandler:
                         weight="bold"
                     )
                 ],
-                backgroundColor="#00ff00",  # 小寫hex綠色
+                background=self._create_gradient_background("#00ff00"),  # 小寫hex綠色
                 paddingAll="20px"
             )
         )
@@ -720,7 +720,7 @@ class LineMessageHandler:
                         weight="bold"
                     )
                 ],
-                backgroundColor="#00F",  # 短格式hex藍色 
+                background=self._create_gradient_background("#00F"),  # 短格式hex藍色 
                 paddingAll="20px"
             )
         )
@@ -743,7 +743,7 @@ class LineMessageHandler:
                         align="center"
                     )
                 ],
-                backgroundColor="#FF6B35",  # header 橙色背景
+                background=self._create_gradient_background("#FF6B35"),  # header 橙色背景
                 paddingAll="16px"
             ),
             body=BoxComponent(
@@ -790,7 +790,7 @@ class LineMessageHandler:
                         align="center"
                     )
                 ],
-                backgroundColor="#4ECDC4",  # body 青色背景
+                background=self._create_gradient_background("#4ECDC4"),  # body 青色背景
                 paddingAll="16px"
             )
         )
@@ -837,7 +837,7 @@ class LineMessageHandler:
                         align="center"
                     )
                 ],
-                backgroundColor="#A17DF5",  # footer 紫色背景
+                background=self._create_gradient_background("#A17DF5"),  # footer 紫色背景
                 paddingAll="16px"
             )
         )
@@ -862,7 +862,7 @@ class LineMessageHandler:
                         offsetBottom="0px",
                         offsetStart="0px", 
                         offsetEnd="0px",
-                        backgroundColor="#FF6B35"  # 橙色背景
+                        background=self._create_gradient_background("#FF6B35")  # 橙色背景
                     ),
                     # 內容 box - 相對定位在背景之上
                     BoxComponent(
@@ -922,7 +922,7 @@ class LineMessageHandler:
                         ],
                         width="100%",
                         height="100%",
-                        backgroundColor="#4ECDC4",  # 青色背景
+                        background=self._create_gradient_background("#4ECDC4"),  # 青色背景
                         paddingAll="16px"
                     )
                 ],
@@ -1185,7 +1185,7 @@ class LineMessageHandler:
                                 color="#666666"
                             )
                         ],
-                        backgroundColor="#F8F9FA",
+                        background=self._create_gradient_background("#F8F9FA"),
                         paddingAll="md",
                         cornerRadius="8px",
                         margin="md"
@@ -1665,16 +1665,16 @@ class LineMessageHandler:
                                     TextComponent(text=" ", size="xxs")
                                 ],
                                 width=f"{identified_percentage}%",
-                                backgroundColor="#0D8186",
+                                background=self._create_gradient_background("#0D8186"),
                                 height="6px"
                             )
                         ],
-                        backgroundColor="#9FD8E36E",
+                        background=self._create_gradient_background("#9FD8E36E"),
                         height="6px",
                         margin="sm"
                     )
                 ],
-                backgroundColor="#4ECDC4",
+                background=self._create_gradient_background("#4ECDC4"),
                 paddingTop="19px",
                 paddingAll="12px",
                 paddingBottom="16px"
@@ -1875,7 +1875,7 @@ class LineMessageHandler:
                         color="#666666"
                     )
                 ],
-                backgroundColor="#F8F9FA",
+                background=self._create_gradient_background("#F8F9FA"),
                 paddingAll="md",
                 cornerRadius="8px"
             )
@@ -1952,7 +1952,7 @@ class LineMessageHandler:
                     spacing="xs"
                 )
             ],
-            backgroundColor=color,
+            background=self._create_gradient_background(color),
             paddingAll="md",
             cornerRadius="8px"
         )
