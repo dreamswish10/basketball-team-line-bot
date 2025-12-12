@@ -43,6 +43,15 @@ class LineMessageHandler:
         db = get_database()
         self.alias_repo = AliasMapRepository(db)
     
+    def _create_gradient_background(self, color, angle="0deg"):
+        """創建線性漸層背景 - 解決 backgroundColor 不顯示的問題"""
+        return {
+            "type": "linearGradient",
+            "angle": angle,
+            "startColor": color,
+            "endColor": color  # 相同顏色創造純色效果
+        }
+    
     def _create_spacer(self, size="md", margin=None):
         """創建間距組件 - 安全的 SpacerComponent 替代方案"""
         if SPACER_AVAILABLE and SpacerComponent:
@@ -1549,14 +1558,13 @@ class LineMessageHandler:
     def _create_nano_team_bubble(self, team, team_number, color):
         """創建 nano 尺寸的隊伍 Bubble"""
         # 添加調試日誌
-        self._log_info(f"[DEBUG] Creating nano bubble for team {team_number} with body backgroundColor: {color}")
+        self._log_info(f"[DEBUG] Creating nano bubble for team {team_number} with linearGradient background: {color}")
         
-        # 測試不同的背景色設定方法
+        # 確保顏色格式正確
         try:
-            # 方法1：確認顏色格式
             if not color.startswith('#'):
                 color = f"#{color}"
-            self._log_info(f"[DEBUG] Formatted color for body background: {color}")
+            self._log_info(f"[DEBUG] Using linearGradient with color: {color}")
         except Exception as e:
             self._log_error(f"[DEBUG] Error formatting color: {e}")
         
@@ -1602,7 +1610,7 @@ class LineMessageHandler:
                         flex=1
                     )
                 ],
-                backgroundColor=color,
+                background=self._create_gradient_background(color),
                 spacing="md",
                 paddingAll="12px"
             ),
