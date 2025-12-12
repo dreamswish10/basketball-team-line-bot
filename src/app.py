@@ -365,6 +365,60 @@ def check_version():
     app.logger.info(f"Version check requested: LINE Bot SDK {linebot.__version__}")
     return version_info
 
+@app.route("/test-bubble")
+def test_bubble():
+    """測試最簡單的背景色 Bubble"""
+    from linebot.models import FlexSendMessage, BubbleContainer, BoxComponent, TextComponent
+    
+    # 建立最簡單的測試 bubble
+    simple_bubble = BubbleContainer(
+        size="nano",
+        header=BoxComponent(
+            layout="vertical",
+            contents=[
+                TextComponent(
+                    text="測試標題",
+                    color="#ffffff",
+                    weight="bold",
+                    size="md"
+                )
+            ],
+            backgroundColor="#FF0000",  # 紅色背景
+            paddingAll="12px"
+        ),
+        body=BoxComponent(
+            layout="vertical",
+            contents=[
+                TextComponent(
+                    text="這是測試內容",
+                    size="sm",
+                    color="#333333",
+                    wrap=True
+                )
+            ],
+            paddingAll="12px"
+        )
+    )
+    
+    flex_message = FlexSendMessage(
+        alt_text="背景色測試",
+        contents=simple_bubble
+    )
+    
+    # 記錄測試訊息
+    app.logger.info("=== 發送測試 Bubble ===")
+    app.logger.info("背景色設定: header backgroundColor=#FF0000 (紅色)")
+    
+    # 這裡我們只返回 JSON 格式供檢查，不實際發送
+    import json
+    bubble_dict = simple_bubble.as_json_dict() if hasattr(simple_bubble, 'as_json_dict') else simple_bubble.__dict__
+    
+    return {
+        "message": "測試 Bubble 已生成",
+        "bubble_structure": json.dumps(bubble_dict, ensure_ascii=False, indent=2),
+        "test_description": "nano size bubble with red header background"
+    }
+
 @app.route("/health")
 def health_check():
     return {"status": "healthy", "service": "basketball-team-generator"}

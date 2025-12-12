@@ -147,6 +147,9 @@ class LineMessageHandler:
             elif message_text.startswith('/delete') or message_text == '刪除資料':
                 self._log_info(f"[COMMAND] Matched: /delete, User: {user_id}")
                 self._handle_delete_command(event, user_id)
+            elif message_text.startswith('/test') or message_text == '測試':
+                self._log_info(f"[COMMAND] Matched: /test, User: {user_id}")
+                self._handle_test_command(event)
             elif message_text.startswith('/help') or message_text == '幫助' or message_text == '說明':
                 self._log_info(f"[COMMAND] Matched: /help, User: {user_id}")
                 self._handle_help_command(event, is_group)
@@ -342,6 +345,140 @@ class LineMessageHandler:
         """處理開始指令"""
         welcome_flex = self._create_welcome_flex()
         self._send_flex_message(event.reply_token, "籃球分隊機器人", welcome_flex)
+    
+    def _handle_test_command(self, event):
+        """處理測試指令 - 發送簡單背景色測試 Bubble"""
+        self._log_info("=== 發送測試 Bubble ===")
+        
+        # 創建三種不同的測試 bubble
+        test_bubbles = [
+            self._create_test_bubble_1(),  # 標準 bubble 紅色背景
+            self._create_test_bubble_2(),  # nano bubble 藍色背景  
+            self._create_test_bubble_3()   # 綠色背景，不同位置
+        ]
+        
+        # 發送測試 carousel
+        from linebot.models import FlexSendMessage, CarouselContainer
+        
+        carousel = CarouselContainer(contents=test_bubbles)
+        flex_message = FlexSendMessage(alt_text="背景色測試", contents=carousel)
+        
+        try:
+            self.line_bot_api.reply_message(event.reply_token, flex_message)
+            self._log_info("✅ 測試 Bubble 已發送")
+        except Exception as e:
+            self._log_error(f"❌ 發送測試 Bubble 失敗: {e}")
+            self._send_message(event.reply_token, f"❌ 測試失敗: {str(e)}")
+    
+    def _create_test_bubble_1(self):
+        """測試 Bubble 1: 標準大小，header 紅色背景"""
+        from linebot.models import BubbleContainer, BoxComponent, TextComponent
+        
+        self._log_info("創建測試 Bubble 1 - 標準大小，header 紅色背景 #FF0000")
+        
+        return BubbleContainer(
+            header=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="測試 1 - 紅色",
+                        color="#ffffff",
+                        weight="bold",
+                        size="lg"
+                    ),
+                    TextComponent(
+                        text="標準大小 bubble",
+                        color="#ffffff", 
+                        size="sm"
+                    )
+                ],
+                backgroundColor="#FF0000",  # 紅色背景
+                paddingAll="16px"
+            ),
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="如果背景色正常，這個 header 應該是紅色的",
+                        size="sm",
+                        color="#333333",
+                        wrap=True
+                    )
+                ],
+                paddingAll="16px"
+            )
+        )
+    
+    def _create_test_bubble_2(self):
+        """測試 Bubble 2: nano 大小，header 藍色背景"""
+        from linebot.models import BubbleContainer, BoxComponent, TextComponent
+        
+        self._log_info("創建測試 Bubble 2 - nano 大小，header 藍色背景 #0066FF")
+        
+        return BubbleContainer(
+            size="nano",
+            header=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="測試 2 - 藍色",
+                        color="#ffffff",
+                        weight="bold",
+                        size="md"
+                    )
+                ],
+                backgroundColor="#0066FF",  # 藍色背景
+                paddingAll="12px"
+            ),
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="nano bubble 藍色背景測試",
+                        size="sm",
+                        color="#333333",
+                        wrap=True
+                    )
+                ],
+                paddingAll="12px"
+            )
+        )
+    
+    def _create_test_bubble_3(self):
+        """測試 Bubble 3: body 綠色背景 (非 header)"""
+        from linebot.models import BubbleContainer, BoxComponent, TextComponent
+        
+        self._log_info("創建測試 Bubble 3 - body 綠色背景 #00AA00")
+        
+        return BubbleContainer(
+            size="nano",
+            header=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="測試 3 - 綠色",
+                        color="#ffffff",
+                        weight="bold",
+                        size="md"
+                    )
+                ],
+                backgroundColor="#666666",  # 灰色背景  
+                paddingAll="12px"
+            ),
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="body 有綠色背景",
+                        size="sm",
+                        color="#ffffff",  # 白色文字配綠色背景
+                        wrap=True
+                    )
+                ],
+                backgroundColor="#00AA00",  # 綠色背景在 body
+                paddingAll="12px"
+            )
+        )
     
     def _handle_unknown_command(self, event, is_group=False):
         """處理未知指令"""
