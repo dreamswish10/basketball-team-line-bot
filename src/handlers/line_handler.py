@@ -1786,7 +1786,7 @@ class LineMessageHandler:
                         name = member.get('name', 'Unknown')
                         # 如果是當前用戶，標示為【你】
                         if member.get('userId') == user_id:
-                            name = f"【你】"
+                            name = f"【{name}】"
                         member_names.append(name)
                     
                     team_lineup = f"第{i}隊：" + "、".join(member_names)
@@ -1850,7 +1850,7 @@ class LineMessageHandler:
             team_lineups = record.get('team_lineups', [])
             
             # Header: 日期 + 用戶隊伍資訊
-            header_text = f"{display_date} - 第{user_team_index}隊"
+            header_text = f"{display_date}"
             
             # Body: 完整陣容列表
             body_contents = []
@@ -1858,7 +1858,7 @@ class LineMessageHandler:
             lineup = team_lineups[user_team_index - 1]
             body_contents.append(
                 TextComponent(
-                    text=f"🏆 你的隊伍陣容：\n{lineup}",
+                    text=f"{lineup}",
                     size="sm",
                     color="#333333",
                     wrap=True
