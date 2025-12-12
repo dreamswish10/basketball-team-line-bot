@@ -147,6 +147,9 @@ class LineMessageHandler:
             elif message_text.startswith('/delete') or message_text == '刪除資料':
                 self._log_info(f"[COMMAND] Matched: /delete, User: {user_id}")
                 self._handle_delete_command(event, user_id)
+            elif message_text.startswith('/test-standard') or message_text == '標準測試':
+                self._log_info(f"[COMMAND] Matched: /test-standard, User: {user_id}")
+                self._handle_test_standard_command(event)
             elif message_text.startswith('/test') or message_text == '測試':
                 self._log_info(f"[COMMAND] Matched: /test, User: {user_id}")
                 self._handle_test_command(event)
@@ -370,13 +373,33 @@ class LineMessageHandler:
             self._log_error(f"❌ 發送測試 Bubble 失敗: {e}")
             self._send_message(event.reply_token, f"❌ 測試失敗: {str(e)}")
     
+    def _handle_test_standard_command(self, event):
+        """處理標準測試指令 - 發送標準大小背景色測試 Bubble"""
+        self._log_info("=== 發送標準大小測試 Bubble ===")
+        
+        # 創建標準大小的測試 bubble
+        standard_bubble = self._create_standard_test_bubble()
+        
+        # 發送單個 bubble (不是 carousel)
+        from linebot.models import FlexSendMessage
+        
+        flex_message = FlexSendMessage(alt_text="標準背景色測試", contents=standard_bubble)
+        
+        try:
+            self.line_bot_api.reply_message(event.reply_token, flex_message)
+            self._log_info("✅ 標準測試 Bubble 已發送")
+        except Exception as e:
+            self._log_error(f"❌ 發送標準測試 Bubble 失敗: {e}")
+            self._send_message(event.reply_token, f"❌ 標準測試失敗: {str(e)}")
+    
     def _create_test_bubble_1(self):
-        """測試 Bubble 1: 標準大小，header 紅色背景"""
+        """測試 Bubble 1: nano 大小，header 紅色背景"""
         from linebot.models import BubbleContainer, BoxComponent, TextComponent
         
-        self._log_info("創建測試 Bubble 1 - 標準大小，header 紅色背景 #FF0000")
+        self._log_info("創建測試 Bubble 1 - nano 大小，header 紅色背景 #FF0000")
         
         return BubbleContainer(
+            size="nano",  # 修正：統一使用 nano 尺寸
             header=BoxComponent(
                 layout="vertical",
                 contents=[
@@ -384,28 +407,28 @@ class LineMessageHandler:
                         text="測試 1 - 紅色",
                         color="#ffffff",
                         weight="bold",
-                        size="lg"
+                        size="md"  # nano bubble 使用 md 而非 lg
                     ),
                     TextComponent(
-                        text="標準大小 bubble",
+                        text="nano bubble 測試",
                         color="#ffffff", 
-                        size="sm"
+                        size="xs"  # 調整為 nano bubble 適當大小
                     )
                 ],
                 backgroundColor="#FF0000",  # 紅色背景
-                paddingAll="16px"
+                paddingAll="12px"  # nano bubble 使用較小 padding
             ),
             body=BoxComponent(
                 layout="vertical",
                 contents=[
                     TextComponent(
-                        text="如果背景色正常，這個 header 應該是紅色的",
+                        text="header 紅色背景測試",
                         size="sm",
                         color="#333333",
                         wrap=True
                     )
                 ],
-                paddingAll="16px"
+                paddingAll="12px"
             )
         )
     
@@ -476,6 +499,72 @@ class LineMessageHandler:
                     )
                 ],
                 backgroundColor="#00AA00",  # 綠色背景在 body
+                paddingAll="12px"
+            )
+        )
+    
+    def _create_standard_test_bubble(self):
+        """創建標準大小的背景色測試 Bubble"""
+        from linebot.models import BubbleContainer, BoxComponent, TextComponent
+        
+        self._log_info("創建標準測試 Bubble - 標準大小，header 橙色背景 #FF6B35")
+        
+        return BubbleContainer(
+            # 不指定 size，默認為標準大小
+            header=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="標準測試 - 橙色",
+                        color="#ffffff",
+                        weight="bold",
+                        size="lg"
+                    ),
+                    TextComponent(
+                        text="標準大小 bubble",
+                        color="#ffffff",
+                        size="md",
+                        margin="sm"
+                    ),
+                    TextComponent(
+                        text="測試 header 背景色",
+                        color="#ffffff",
+                        size="sm",
+                        margin="sm"
+                    )
+                ],
+                backgroundColor="#FF6B35",  # 橙色背景
+                paddingAll="20px"
+            ),
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="如果背景色功能正常，上方 header 應該顯示為橙色背景",
+                        size="md",
+                        color="#333333",
+                        wrap=True
+                    ),
+                    TextComponent(
+                        text="這是標準大小的 Bubble，比 nano 更大更詳細",
+                        size="sm",
+                        color="#666666",
+                        wrap=True,
+                        margin="md"
+                    )
+                ],
+                paddingAll="20px"
+            ),
+            footer=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="⚡ 標準尺寸背景色測試",
+                        size="sm",
+                        color="#999999",
+                        align="center"
+                    )
+                ],
                 paddingAll="12px"
             )
         )
