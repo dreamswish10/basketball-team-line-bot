@@ -147,6 +147,12 @@ class LineMessageHandler:
             elif message_text.startswith('/delete') or message_text == '刪除資料':
                 self._log_info(f"[COMMAND] Matched: /delete, User: {user_id}")
                 self._handle_delete_command(event, user_id)
+            elif message_text.startswith('/test-position') or message_text == '位置測試':
+                self._log_info(f"[COMMAND] Matched: /test-position, User: {user_id}")
+                self._handle_test_position_command(event)
+            elif message_text.startswith('/test-minimal') or message_text == '最簡測試':
+                self._log_info(f"[COMMAND] Matched: /test-minimal, User: {user_id}")
+                self._handle_test_minimal_command(event)
             elif message_text.startswith('/test-standard') or message_text == '標準測試':
                 self._log_info(f"[COMMAND] Matched: /test-standard, User: {user_id}")
                 self._handle_test_standard_command(event)
@@ -392,6 +398,54 @@ class LineMessageHandler:
             self._log_error(f"❌ 發送標準測試 Bubble 失敗: {e}")
             self._send_message(event.reply_token, f"❌ 標準測試失敗: {str(e)}")
     
+    def _handle_test_minimal_command(self, event):
+        """處理最簡測試指令 - 發送最簡化的背景色測試"""
+        self._log_info("=== 發送最簡化背景色測試 ===")
+        
+        # 創建3個最簡化測試 bubble：不同顏色格式 + 不同位置
+        test_bubbles = [
+            self._create_minimal_test_1(),  # 大寫hex #FF0000
+            self._create_minimal_test_2(),  # 小寫hex #00ff00  
+            self._create_minimal_test_3()   # 短格式 #00F
+        ]
+        
+        # 發送測試 carousel
+        from linebot.models import FlexSendMessage, CarouselContainer
+        
+        carousel = CarouselContainer(contents=test_bubbles)
+        flex_message = FlexSendMessage(alt_text="最簡背景色測試", contents=carousel)
+        
+        try:
+            self.line_bot_api.reply_message(event.reply_token, flex_message)
+            self._log_info("✅ 最簡測試已發送")
+        except Exception as e:
+            self._log_error(f"❌ 發送最簡測試失敗: {e}")
+            self._send_message(event.reply_token, f"❌ 最簡測試失敗: {str(e)}")
+    
+    def _handle_test_position_command(self, event):
+        """處理位置測試指令 - 測試header, body, footer不同位置的背景色"""
+        self._log_info("=== 發送位置背景色測試 ===")
+        
+        # 創建3個測試不同位置的 bubble
+        test_bubbles = [
+            self._create_position_test_header(),  # header背景色
+            self._create_position_test_body(),    # body背景色
+            self._create_position_test_footer()   # footer背景色
+        ]
+        
+        # 發送測試 carousel
+        from linebot.models import FlexSendMessage, CarouselContainer
+        
+        carousel = CarouselContainer(contents=test_bubbles)
+        flex_message = FlexSendMessage(alt_text="位置背景色測試", contents=carousel)
+        
+        try:
+            self.line_bot_api.reply_message(event.reply_token, flex_message)
+            self._log_info("✅ 位置測試已發送")
+        except Exception as e:
+            self._log_error(f"❌ 發送位置測試失敗: {e}")
+            self._send_message(event.reply_token, f"❌ 位置測試失敗: {str(e)}")
+    
     def _create_test_bubble_1(self):
         """測試 Bubble 1: nano 大小，header 紅色背景"""
         from linebot.models import BubbleContainer, BoxComponent, TextComponent
@@ -566,6 +620,189 @@ class LineMessageHandler:
                     )
                 ],
                 paddingAll="12px"
+            )
+        )
+    
+    def _create_minimal_test_1(self):
+        """最簡測試1: 大寫hex顏色 #FF0000 (紅色)"""
+        from linebot.models import BubbleContainer, BoxComponent, TextComponent
+        
+        self._log_info("創建最簡測試1 - 大寫hex #FF0000")
+        
+        return BubbleContainer(
+            size="nano",
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="紅色",
+                        color="#ffffff",
+                        weight="bold"
+                    )
+                ],
+                backgroundColor="#FF0000",  # 大寫hex紅色
+                paddingAll="20px"
+            )
+        )
+    
+    def _create_minimal_test_2(self):
+        """最簡測試2: 小寫hex顏色 #00ff00 (綠色)"""
+        from linebot.models import BubbleContainer, BoxComponent, TextComponent
+        
+        self._log_info("創建最簡測試2 - 小寫hex #00ff00")
+        
+        return BubbleContainer(
+            size="nano", 
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="綠色",
+                        color="#ffffff",
+                        weight="bold"
+                    )
+                ],
+                backgroundColor="#00ff00",  # 小寫hex綠色
+                paddingAll="20px"
+            )
+        )
+    
+    def _create_minimal_test_3(self):
+        """最簡測試3: 短格式hex顏色 #00F (藍色)"""
+        from linebot.models import BubbleContainer, BoxComponent, TextComponent
+        
+        self._log_info("創建最簡測試3 - 短格式hex #00F")
+        
+        return BubbleContainer(
+            size="nano",
+            body=BoxComponent(
+                layout="vertical", 
+                contents=[
+                    TextComponent(
+                        text="藍色",
+                        color="#ffffff",
+                        weight="bold"
+                    )
+                ],
+                backgroundColor="#00F",  # 短格式hex藍色 
+                paddingAll="20px"
+            )
+        )
+    
+    def _create_position_test_header(self):
+        """位置測試1: header 背景色"""
+        from linebot.models import BubbleContainer, BoxComponent, TextComponent
+        
+        self._log_info("創建位置測試1 - header 背景色 #FF6B35")
+        
+        return BubbleContainer(
+            size="nano",
+            header=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="Header",
+                        color="#ffffff",
+                        weight="bold",
+                        align="center"
+                    )
+                ],
+                backgroundColor="#FF6B35",  # header 橙色背景
+                paddingAll="16px"
+            ),
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="測試header背景色",
+                        size="sm",
+                        color="#333333",
+                        align="center"
+                    )
+                ],
+                paddingAll="16px"
+            )
+        )
+    
+    def _create_position_test_body(self):
+        """位置測試2: body 背景色"""
+        from linebot.models import BubbleContainer, BoxComponent, TextComponent
+        
+        self._log_info("創建位置測試2 - body 背景色 #4ECDC4")
+        
+        return BubbleContainer(
+            size="nano",
+            header=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="Body測試",
+                        color="#333333",
+                        weight="bold",
+                        align="center"
+                    )
+                ],
+                paddingAll="16px"
+            ),
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="Body",
+                        color="#ffffff",
+                        weight="bold",
+                        align="center"
+                    )
+                ],
+                backgroundColor="#4ECDC4",  # body 青色背景
+                paddingAll="16px"
+            )
+        )
+    
+    def _create_position_test_footer(self):
+        """位置測試3: footer 背景色"""
+        from linebot.models import BubbleContainer, BoxComponent, TextComponent
+        
+        self._log_info("創建位置測試3 - footer 背景色 #A17DF5")
+        
+        return BubbleContainer(
+            size="nano",
+            header=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="Footer測試",
+                        color="#333333",
+                        weight="bold",
+                        align="center"
+                    )
+                ],
+                paddingAll="16px"
+            ),
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="測試footer背景色",
+                        size="sm",
+                        color="#333333",
+                        align="center"
+                    )
+                ],
+                paddingAll="16px"
+            ),
+            footer=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text="Footer",
+                        color="#ffffff",
+                        weight="bold",
+                        align="center"
+                    )
+                ],
+                backgroundColor="#A17DF5",  # footer 紫色背景
+                paddingAll="16px"
             )
         )
     
