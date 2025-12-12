@@ -1855,36 +1855,15 @@ class LineMessageHandler:
             # Body: 完整陣容列表
             body_contents = []
             
-            # 添加陣容標題
+            lineup = team_lineups[user_team_index - 1]
             body_contents.append(
                 TextComponent(
-                    text=f"當日組隊陣容 (共{total_teams}隊)",
+                    text=f"🏆 你的隊伍陣容：\n{lineup}",
                     size="sm",
-                    color="#8C8C8C",
-                    margin="none"
+                    color="#333333",
+                    wrap=True
                 )
             )
-            
-            # 添加分隔線
-            body_contents.append(SeparatorComponent(margin="sm"))
-            
-            # 添加每隊陣容
-            for i, lineup in enumerate(team_lineups):
-                # 判斷是否為用戶所在隊伍
-                is_user_team = (i + 1) == user_team_index
-                text_color = "#333333" if not is_user_team else "#0099CC"
-                text_weight = "regular" if not is_user_team else "bold"
-                
-                body_contents.append(
-                    TextComponent(
-                        text=lineup,
-                        size="sm",
-                        color=text_color,
-                        weight=text_weight,
-                        wrap=True,
-                        margin="sm"
-                    )
-                )
             
             return BubbleContainer(
                 size="nano",
