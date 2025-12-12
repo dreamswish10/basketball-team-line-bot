@@ -932,7 +932,7 @@ class LineMessageHandler:
                 contents=[
                     TextComponent(
                         text=f"隊伍 {team_number}",
-                        color="#ffffff",
+                        color="#090808",
                         align="start",
                         size="md",
                         gravity="center",
@@ -940,7 +940,7 @@ class LineMessageHandler:
                     ),
                     TextComponent(
                         text=f"{len(team)} 人",
-                        color="#ffffff",
+                        color="#0f0e0e",
                         align="start",
                         size="xs",
                         gravity="center",
