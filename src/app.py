@@ -347,6 +347,24 @@ def handle_leave(event):
         except Exception as e:
             app.logger.error(f"Error handling leave event: {e}")
 
+@app.route("/version")
+def check_version():
+    """檢查系統版本資訊"""
+    import linebot
+    import sys
+    import platform
+    
+    version_info = {
+        "service": "basketball-team-generator",
+        "line_bot_sdk_version": linebot.__version__,
+        "python_version": sys.version.split()[0],
+        "platform": platform.platform(),
+        "status": "running"
+    }
+    
+    app.logger.info(f"Version check requested: LINE Bot SDK {linebot.__version__}")
+    return version_info
+
 @app.route("/health")
 def health_check():
     return {"status": "healthy", "service": "basketball-team-generator"}

@@ -32,8 +32,13 @@ import random
 
 class LineMessageHandler:
     def __init__(self, line_bot_api, logger=None):
+        import linebot
         self.line_bot_api = line_bot_api
         self.logger = logger
+        
+        # 記錄 LINE Bot SDK 版本
+        self._log_info(f"=== LINE Bot SDK Version: {linebot.__version__} ===")
+        
         # Initialize MongoDB repositories
         db = get_database()
         self.alias_repo = AliasMapRepository(db)
