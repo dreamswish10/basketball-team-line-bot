@@ -182,8 +182,13 @@ class LineMessageHandler:
                 self._log_info(f"[COMMAND] Matched: /分隊, User: {user_id}")
                 self._handle_custom_team_command(event, message_text)
             elif message_text.startswith('/查詢') or message_text.startswith('/query') or message_text == '查詢' or message_text == 'query':
-                self._log_info(f"[COMMAND] Matched: /查詢, User: {user_id}")
-                self._handle_query_command(event, user_id)
+                parts = message_text.split(maxsplit=1)
+                if len(parts) > 1:
+                    target_name = parts[1].strip()   # 這就是你要拿來當 user_id 的人名
+                else:
+                    target_name = None 
+                self._log_info(f"[COMMAND] Matched: /查詢, User: {target_name}")
+                self._handle_query_command(event, target_name)
             else:
                 self._log_warning(f"[UNKNOWN] Command not recognized: '{message_text}', User: {user_id}")
                 self._handle_unknown_command(event, is_group)
