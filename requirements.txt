@@ -2,7 +2,7 @@
 Flask==3.0.0
 
 # LINE Bot SDK (最新版本，修復 aiohttp 兼容性問題)
-line-bot-sdk==3.8.0
+line-bot-sdk==3.20.0
 
 # aiohttp (明確指定兼容版本)
 aiohttp>=3.9.0
