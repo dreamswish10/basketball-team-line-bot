@@ -292,6 +292,7 @@ def handle_join(event):
                 "example: /查詢 勇\n\n"
                 "🔹 /分隊 - 目前僅支持字串分隊\n"
                 "example: /分隊 Alice,Bob,Charlie,David 2\n\n"
+                "資料從 12/7 (日) 起開始記錄。"
             )
 
             line_bot_api.push_message(group_id, TextSendMessage(text=welcome_message))
