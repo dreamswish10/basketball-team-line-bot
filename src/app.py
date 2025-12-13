@@ -245,6 +245,12 @@ def handle_message(event):
     user_id = event.source.user_id
     message_text = event.message.text
     source_type = event.source.type
+    
+    # 只允許特定 user_id 處理
+    allowed_user_id = "Uad0a5328227d993e0e30459cd43f4d2f"  # 這裡改成你允許的 user_id
+    if user_id != allowed_user_id:
+        app.logger.info(f"[WEBHOOK] Ignored message from user: {user_id}")
+        return  # 直接不處理
 
     app.logger.info(f"[WEBHOOK] Message event received")
     app.logger.info(f"[WEBHOOK] User ID: {user_id}")
@@ -280,14 +286,12 @@ def handle_join(event):
 
             # 發送歡迎訊息
             welcome_message = (
-                "🏀 籃球分隊機器人已加入群組！\n\n"
+                "🏀 Hoops Bot 已加入群組！\n\n"
                 "群組專用功能：\n"
-                "🔹 /group_team - 使用群組成員分隊\n"
-                "🔹 /group_players - 查看群組成員\n"
-                "🔹 /group_stats - 群組統計資訊\n\n"
-                "個人功能：\n"
-                "🔹 /register - 詳細註冊\n"
-                "🔹 /help - 完整說明"
+                "🔹 /查詢 - 查看個人近五次的組隊\n"
+                "example: /查詢 勇\n\n"
+                "🔹 /分隊 - 目前僅支持字串分隊\n"
+                "example: /分隊 Alice,Bob,Charlie,David 2\n\n"
             )
 
             line_bot_api.push_message(group_id, TextSendMessage(text=welcome_message))
@@ -300,24 +304,24 @@ def handle_join(event):
             app.logger.error(f"[GROUP_JOIN] Error handling join event: {e}")
             app.logger.info(f"[GROUP_JOIN] ========================================")
 
-@handler.add(MemberJoinedEvent)
-def handle_member_joined(event):
-    """處理新成員加入群組事件"""
-    if hasattr(event.source, 'group_id'):
-        group_id = event.source.group_id
-        joined_users = event.joined.members
+# @handler.add(MemberJoinedEvent)
+# def handle_member_joined(event):
+#     """處理新成員加入群組事件"""
+#     if hasattr(event.source, 'group_id'):
+#         group_id = event.source.group_id
+#         joined_users = event.joined.members
         
-        app.logger.info(f"New members joined group {group_id}: {len(joined_users)} users")
+#         app.logger.info(f"New members joined group {group_id}: {len(joined_users)} users")
         
-        try:
-            # 重新同步群組成員
-            group_manager.sync_group_members(group_id)
+#         try:
+#             # 重新同步群組成員
+#             group_manager.sync_group_members(group_id)
             
-        except Exception as e:
-            app.logger.error(f"Error handling member joined event: {e}")
+#         except Exception as e:
+#             app.logger.error(f"Error handling member joined event: {e}")
 
-@handler.add(MemberLeftEvent)
-def handle_member_left(event):
+# @handler.add(MemberLeftEvent)
+# def handle_member_left(event):
     """處理成員離開群組事件"""
     if hasattr(event.source, 'group_id'):
         group_id = event.source.group_id
