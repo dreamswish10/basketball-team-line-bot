@@ -106,6 +106,11 @@ class LineMessageHandler:
         """處理文字訊息"""
         user_id = event.source.user_id
         message_text = event.message.text.strip()
+        
+         # 只處理以斜線 / 開頭的訊息
+        if not message_text.startswith("/"):
+            # 非指令訊息不處理
+            return
 
         try:
             # 檢查是否為群組訊息
