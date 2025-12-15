@@ -1812,20 +1812,25 @@ class LineMessageHandler:
         """創建單一分隊選項的 bubble"""
         from datetime import datetime
         
-        # 格式化隊伍資訊 - 顯示更完整的成員名稱
-        team_info_lines = []
+        # 為每個隊伍創建獨立的 TextComponent
+        team_components = []
         for i, team in enumerate(teams, 1):
             member_names = [player['name'] for player in team]
             if len(member_names) <= 3:
                 # 3人以下顯示所有成員
-                team_line = f"🏀 隊伍{i}: " + "、".join(member_names)
+                team_text = f"🏀 隊伍{i}: " + "、".join(member_names)
             else:
                 # 3人以上顯示前3人 + 人數
-                team_line = f"🏀 隊伍{i}: " + "、".join(member_names[:3]) + f"等{len(member_names)}人"
-            team_info_lines.append(team_line)
-        
-        # 組合隊伍資訊文字
-        team_info_text = "\n".join(team_info_lines)
+                team_text = f"🏀 隊伍{i}: " + "、".join(member_names[:3]) + f"等{len(member_names)}人"
+            
+            team_component = TextComponent(
+                text=team_text,
+                size="sm",  # 從 xs 改為 sm 提升可讀性
+                color="#333333",
+                wrap=True,
+                margin="xs" if i > 1 else None  # 第一隊不需要 margin，其他隊加上間距
+            )
+            team_components.append(team_component)
         
         return BubbleContainer(
             size="nano",
@@ -1852,17 +1857,9 @@ class LineMessageHandler:
             ),
             body=BoxComponent(
                 layout="vertical",
-                contents=[
-                    TextComponent(
-                        text=team_info_text,
-                        size="xs",
-                        color="#333333",
-                        wrap=True,
-                        lineSpacing="sm"
-                    )
-                ],
-                paddingAll="12px",
-                spacing="sm"
+                contents=team_components,
+                paddingAll="14px",  # 增加一點 padding
+                spacing="xs"  # 減少間距避免太分散
             ),
             footer=BoxComponent(
                 layout="vertical",
