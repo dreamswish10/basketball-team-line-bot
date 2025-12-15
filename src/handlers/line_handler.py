@@ -1818,10 +1818,10 @@ class LineMessageHandler:
             member_names = [player['name'] for player in team]
             if len(member_names) <= 3:
                 # 3人以下顯示所有成員
-                team_text = f"🏀 隊伍{i}: " + "、".join(member_names)
+                team_text = f"隊伍{i}: " + "、".join(member_names)
             else:
                 # 3人以上顯示前3人 + 人數
-                team_text = f"🏀 隊伍{i}: " + "、".join(member_names[:3]) + f"等{len(member_names)}人"
+                team_text = f"隊伍{i}: " + "、".join(member_names[:3]) + f"等{len(member_names)}人"
             
             team_component = TextComponent(
                 text=team_text,
@@ -1833,7 +1833,7 @@ class LineMessageHandler:
             team_components.append(team_component)
         
         return BubbleContainer(
-            size="nano",
+            # 移除 size="nano" 使用標準尺寸，提供更多橫向空間
             header=BoxComponent(
                 layout="vertical",
                 contents=[
@@ -1853,13 +1853,13 @@ class LineMessageHandler:
                     )
                 ],
                 background=self._create_gradient_background(color),
-                paddingAll="16px"
+                paddingAll="20px"  # 標準尺寸可以用更多 padding
             ),
             body=BoxComponent(
                 layout="vertical",
                 contents=team_components,
-                paddingAll="14px",  # 增加一點 padding
-                spacing="xs"  # 減少間距避免太分散
+                paddingAll="20px",  # 增加 padding 提供更好的視覺空間
+                spacing="xs"  # 保持緊湊的隊伍間距
             ),
             footer=BoxComponent(
                 layout="vertical",
@@ -1873,7 +1873,7 @@ class LineMessageHandler:
                         color=color
                     )
                 ],
-                paddingAll="12px"
+                paddingAll="16px"  # 稍微增加 footer padding
             )
         )
 
