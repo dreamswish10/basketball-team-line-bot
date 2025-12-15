@@ -1245,35 +1245,6 @@ class LineMessageHandler:
             print(f"Error handling sync command: {e}")
             self._send_message(event.reply_token, "❌ 同步失敗，請稍後再試")
     
-    def _send_multiple_team_selection_messages(self, reply_token, selection_carousels):
-        """發送多個分隊選擇 Carousel 訊息"""
-        try:
-            if not selection_carousels:
-                self._send_message(reply_token, "❌ 無法創建分隊選項")
-                return
-            
-            messages = []
-            
-            # 第一個訊息包含說明文字
-            intro_text = "🏀 分隊選項產生完成！\n\n📋 以下是 3 組不同的分隊方案，請選擇您喜歡的組合："
-            messages.append(TextSendMessage(text=intro_text))
-            
-            # 為每個 Carousel 創建 Flex 訊息
-            for i, carousel in enumerate(selection_carousels):
-                alt_text = f"分隊選項 {i + 1}"
-                flex_message = FlexSendMessage(alt_text=alt_text, contents=carousel)
-                messages.append(flex_message)
-            
-            # 使用 LINE Bot API 發送多個訊息
-            self.line_bot_api.reply_message(reply_token, messages)
-            
-            self._log_info(f"[SEND] Sent {len(messages)} team selection messages")
-            
-        except Exception as e:
-            self._log_error(f"Error sending multiple team selection messages: {e}")
-            # 回退到簡單文字訊息
-            self._send_message(reply_token, "❌ 發送分隊選項失敗，請稍後再試")
-    
     def _send_message(self, reply_token, message_text, quick_reply=None):
         """發送訊息"""
         try:
@@ -1485,11 +1456,11 @@ class LineMessageHandler:
             # 暫存分隊選項供使用者選擇
             self._store_pending_team_selection(user_id, team_options, mapping_info)
             
-            # 創建分隊選擇 Flex Messages（多個完整 Carousel）
-            selection_carousels = self._create_team_selection_flex(team_options, mapping_info, user_id)
+            # 創建分隊選擇 Flex Message（單一 Carousel 包含 3 個選項）
+            selection_flex = self._create_team_selection_flex(team_options, mapping_info, user_id)
             
-            # 發送多個分隊選項 Carousel
-            self._send_multiple_team_selection_messages(event.reply_token, selection_carousels)
+            # 發送分隊選項 Carousel
+            self._send_flex_message(event.reply_token, "請選擇分隊方案", selection_flex)
             
         except Exception as e:
             self._log_error(f"Error in custom team command: {e}")
@@ -1818,109 +1789,39 @@ class LineMessageHandler:
         return message
     
     def _create_team_selection_flex(self, team_options, mapping_info, user_id):
-        """創建分隊選擇 Flex Messages (每組選項都是完整的 Carousel)"""
-        selection_carousels = []
+        """創建分隊選擇 Flex Message (單一 Carousel 包含 3 個選項 bubble)"""
+        bubbles = []
+        option_colors = ["#FF6B35", "#4ECDC4", "#A17DF5"]
         
         # 如果只有一組選項（人數 <= 4），直接返回簡單結果
         if len(team_options) == 1 and len(team_options[0]) == 1:
-            return [self._create_simple_team_bubble(team_options[0][0], mapping_info)]
+            return self._create_simple_team_bubble(team_options[0][0], mapping_info)
         
-        # 為每個分隊選項創建完整的 Carousel
+        # 為每個分隊選項創建簡潔的選項 bubble
         for option_idx, teams in enumerate(team_options):
-            option_carousel = self._create_team_option_carousel(teams, option_idx + 1, mapping_info, user_id)
-            selection_carousels.append(option_carousel)
+            color = option_colors[option_idx % len(option_colors)]
+            option_bubble = self._create_team_option_bubble(teams, option_idx + 1, color, user_id)
+            bubbles.append(option_bubble)
         
-        return selection_carousels
-    
-    def _create_team_option_carousel(self, teams, option_number, mapping_info, user_id):
-        """為單一分隊選項創建完整的 Carousel（包含選擇按鈕的 info bubble + 所有隊伍詳細 bubble）"""
-        bubbles = []
-        team_colors = ["#27ACB2", "#FF6B6E", "#A17DF5", "#4ECDC4", "#45B7D1", "#96CEB4"]
-        
-        # 創建帶有選擇按鈕的 info bubble
-        info_bubble = self._create_selectable_info_bubble(option_number, len(teams), user_id)
-        bubbles.append(info_bubble)
-        
-        # 為每個隊伍創建 nano bubble
-        for i, team in enumerate(teams):
-            color = team_colors[i % len(team_colors)]
-            team_bubble = self._create_nano_team_bubble(team, i + 1, color)
-            bubbles.append(team_bubble)
-        
-        # 創建 Carousel
+        # 創建單一 Carousel 包含所有選項
         carousel = CarouselContainer(contents=bubbles)
         return carousel
     
-    def _create_selectable_info_bubble(self, option_number, team_count, user_id):
-        """創建帶有選擇按鈕的資訊 bubble"""
-        from datetime import datetime
-        
-        # 獲取當前月日
-        now = datetime.now()
-        date_str = f"{now.month}/{now.day}"
-        
-        # 設定選項顏色
-        option_colors = ["#FF6B35", "#4ECDC4", "#A17DF5"]
-        color = option_colors[(option_number - 1) % len(option_colors)]
-        
-        return BubbleContainer(
-            size="nano",
-            header=BoxComponent(
-                layout="vertical",
-                contents=[
-                    TextComponent(
-                        text=f"選項 {option_number}",
-                        color="#ffffff",
-                        align="center",
-                        size="lg",
-                        weight="bold"
-                    )
-                ],
-                background=self._create_gradient_background(color),
-                paddingAll="16px"
-            ),
-            body=BoxComponent(
-                layout="vertical",
-                contents=[
-                    TextComponent(
-                        text=f"{date_str} · 共{team_count}隊",
-                        color="#666666",
-                        align="center",
-                        size="xs",
-                        margin="sm"
-                    )
-                ],
-                paddingAll="12px"
-            ),
-            footer=BoxComponent(
-                layout="vertical",
-                contents=[
-                    ButtonComponent(
-                        action=PostbackAction(
-                            label="選擇這組",
-                            data=f"action=select_team&option={option_number}&user_id={user_id}"
-                        ),
-                        style="primary",
-                        color=color,
-                        height="sm"
-                    )
-                ],
-                paddingAll="8px"
-            )
-        )
     
     def _create_team_option_bubble(self, teams, option_number, color, user_id):
         """創建單一分隊選項的 bubble"""
         from datetime import datetime
         
-        # 格式化隊伍資訊
+        # 格式化隊伍資訊 - 顯示更完整的成員名稱
         team_info_lines = []
         for i, team in enumerate(teams, 1):
             member_names = [player['name'] for player in team]
-            if len(member_names) <= 2:
-                team_line = f"隊伍{i}: " + "、".join(member_names)
+            if len(member_names) <= 3:
+                # 3人以下顯示所有成員
+                team_line = f"🏀 隊伍{i}: " + "、".join(member_names)
             else:
-                team_line = f"隊伍{i}: " + "、".join(member_names[:2]) + f"等{len(member_names)}人"
+                # 3人以上顯示前3人 + 人數
+                team_line = f"🏀 隊伍{i}: " + "、".join(member_names[:3]) + f"等{len(member_names)}人"
             team_info_lines.append(team_line)
         
         # 組合隊伍資訊文字
