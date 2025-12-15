@@ -261,6 +261,13 @@ def handle_message(event):
 
 @handler.add(PostbackEvent)
 def handle_postback(event):
+    user_id = event.source.user_id
+    
+    allowed_user_id = "Uad0a5328227d993e0e30459cd43f4d2f"  # 這裡改成你允許的 user_id
+    if user_id != allowed_user_id:
+        app.logger.info(f"[WEBHOOK] Ignored message from user: {user_id}")
+        return  # 直接不處理
+    
     message_handler.handle_postback_event(event)
 
 @handler.add(JoinEvent)
