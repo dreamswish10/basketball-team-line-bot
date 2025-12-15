@@ -1874,13 +1874,6 @@ class LineMessageHandler:
                         align="center",
                         size="lg",
                         weight="bold"
-                    ),
-                    TextComponent(
-                        text=f"{date_str} · 共{team_count}隊",
-                        color="#ffffff",
-                        align="center",
-                        size="sm",
-                        margin="sm"
                     )
                 ],
                 background=self._create_gradient_background(color),
@@ -1890,7 +1883,7 @@ class LineMessageHandler:
                 layout="vertical",
                 contents=[
                     TextComponent(
-                        text="請查看右側隊伍詳細資訊",
+                        text=f"{date_str} · 共{team_count}隊",
                         color="#666666",
                         align="center",
                         size="xs",
@@ -1904,7 +1897,7 @@ class LineMessageHandler:
                 contents=[
                     ButtonComponent(
                         action=PostbackAction(
-                            label="✅ 選擇這組",
+                            label="選擇這組",
                             data=f"action=select_team&option={option_number}&user_id={user_id}"
                         ),
                         style="primary",
@@ -1912,7 +1905,7 @@ class LineMessageHandler:
                         height="sm"
                     )
                 ],
-                paddingAll="12px"
+                paddingAll="8px"
             )
         )
     
