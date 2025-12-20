@@ -237,6 +237,12 @@ class LineMessageHandler:
                     target_name = None 
                 self._log_info(f"[COMMAND] Matched: /查詢, User: {target_name}")
                 self._handle_query_command(event, target_name)
+            elif message_text.startswith('/add_user') or message_text.startswith('新增使用者'):
+                self._log_info(f"[COMMAND] Matched: /add_user, User: {user_id}")
+                self._handle_add_user_command(event, message_text)
+            elif message_text.startswith('/remove_user') or message_text.startswith('移除使用者'):
+                self._log_info(f"[COMMAND] Matched: /remove_user, User: {user_id}")
+                self._handle_remove_user_command(event, message_text)
             else:
                 self._log_warning(f"[UNKNOWN] Command not recognized: '{message_text}', User: {user_id}")
                 self._handle_unknown_command(event, is_group)
@@ -465,6 +471,10 @@ class LineMessageHandler:
         message += "📝 個人指令：\n"
         message += "🔸 /register 姓名 投籃 防守 體力\n"
         message += "   註冊球員 (技能值 1-10)\n"
+        message += "🔸 /add_user 姓名\n"
+        message += "   新增球員\n"
+        message += "🔸 /remove_user 姓名\n"
+        message += "   移除球員\n"
         message += "🔸 /list\n"
         message += "   查看所有球員\n"
         message += "🔸 /team [隊數]\n"
@@ -477,6 +487,8 @@ class LineMessageHandler:
         if is_group:
             message += "• /group_team 2 (群組快速分隊)\n"
         message += "• /register 小明 8 7 9\n"
+        message += "• /add_user 小華\n"
+        message += "• /remove_user 小李\n"
         message += "• /team 3\n\n"
         message += "⚠️ 注意事項：\n"
         message += "• 技能值範圍：1-10\n"
@@ -1495,6 +1507,94 @@ class LineMessageHandler:
         except Exception as e:
             self._log_error(f"Error in query command: {e}")
             self._send_message(event.reply_token, "❌ 查詢失敗，請稍後再試")
+    
+    def _handle_add_user_command(self, event, message_text):
+        """處理新增使用者指令"""
+        try:
+            # 解析新增指令：/add_user 姓名 或 新增使用者 姓名
+            patterns = [
+                r'/add_user\s+(.+)',
+                r'新增使用者\s+(.+)'
+            ]
+            
+            user_name = None
+            for pattern in patterns:
+                match = re.match(pattern, message_text.strip())
+                if match:
+                    user_name = match.group(1).strip()
+                    break
+            
+            if not user_name:
+                self._send_message(event.reply_token, 
+                    "❌ 格式錯誤\n\n正確格式：\n"
+                    "🔸 /add_user 姓名\n"
+                    "🔸 新增使用者 姓名\n\n"
+                    "範例：/add_user 小明"
+                )
+                return
+            
+            # 檢查是否已經存在
+            existing_user = self.alias_repo.find_user_by_alias(user_name)
+            if existing_user:
+                self._send_message(event.reply_token, f"⚠️ 使用者 '{user_name}' 已存在")
+                return
+            
+            # 新增使用者到別名映射（使用姓名作為唯一 ID）
+            success = self.alias_repo.create_or_update_alias(user_name, [user_name])
+            
+            if success:
+                self._log_info(f"[ADD_USER] Successfully added user: {user_name}")
+                self._send_message(event.reply_token, f"✅ 成功新增使用者：{user_name}")
+            else:
+                self._send_message(event.reply_token, "❌ 新增使用者失敗，請稍後再試")
+                
+        except Exception as e:
+            self._log_error(f"Error in add_user command: {e}")
+            self._send_message(event.reply_token, "❌ 新增使用者失敗，請稍後再試")
+    
+    def _handle_remove_user_command(self, event, message_text):
+        """處理移除使用者指令"""
+        try:
+            # 解析移除指令：/remove_user 姓名 或 移除使用者 姓名
+            patterns = [
+                r'/remove_user\s+(.+)',
+                r'移除使用者\s+(.+)'
+            ]
+            
+            user_name = None
+            for pattern in patterns:
+                match = re.match(pattern, message_text.strip())
+                if match:
+                    user_name = match.group(1).strip()
+                    break
+            
+            if not user_name:
+                self._send_message(event.reply_token, 
+                    "❌ 格式錯誤\n\n正確格式：\n"
+                    "🔸 /remove_user 姓名\n"
+                    "🔸 移除使用者 姓名\n\n"
+                    "範例：/remove_user 小明"
+                )
+                return
+            
+            # 檢查使用者是否存在
+            existing_user = self.alias_repo.find_user_by_alias(user_name)
+            if not existing_user:
+                self._send_message(event.reply_token, f"⚠️ 找不到使用者：{user_name}")
+                return
+            
+            # 移除使用者
+            success = self.alias_repo.delete_user_aliases(existing_user)
+            
+            if success:
+                self._log_info(f"[REMOVE_USER] Successfully removed user: {user_name}")
+                self._send_message(event.reply_token, f"✅ 成功移除使用者：{user_name}")
+            else:
+                self._send_message(event.reply_token, "❌ 移除使用者失敗，請稍後再試")
+                
+        except Exception as e:
+            self._log_error(f"Error in remove_user command: {e}")
+            self._send_message(event.reply_token, "❌ 移除使用者失敗，請稍後再試")
     
     def _is_valid_team_content(self, text):
         """檢查文字是否包含有效的成員名單格式"""
