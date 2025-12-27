@@ -1429,9 +1429,80 @@ class LineMessageHandler:
                 self._send_message(event.reply_token,
                     "❌ 無法識別成員名單\n\n"
                     "請確保成員名稱用逗號、頓號分隔\n"
+                    "或使用方括號預設分隊：[隊員1,隊員2] [隊員3,隊員4]\n"
                     "例如：🥛、凱、豪、金、kin、勇")
                 return
             
+            user_id = event.source.user_id
+            
+            # 檢查是否使用方括號群組分隊
+            if '[' in target_text and ']' in target_text:
+                # 使用新的群組解析
+                groups, individual_members = self._parse_bracket_groups(target_text)
+                
+                if not groups and not individual_members:
+                    self._send_message(event.reply_token, 
+                        "❌ 無法解析方括號群組格式\n\n"
+                        "請使用正確格式：[隊友1,隊友2] 個別成員1 個別成員2\n"
+                        "每個群組最多3人")
+                    return
+                
+                # 檢查是否所有群組都超過隊伍限制
+                invalid_groups = [group for group in groups if len(group) > 3]
+                if invalid_groups:
+                    self._send_message(event.reply_token, 
+                        f"❌ 發現超過3人的群組: {invalid_groups}\n\n"
+                        "每個群組最多3人（3vs3比賽限制）")
+                    return
+                
+                # 計算總人數
+                total_count = sum(len(group) for group in groups) + len(individual_members)
+                
+                if total_count < 1:
+                    self._send_message(event.reply_token, "❌ 請至少輸入 1 位成員")
+                    return
+                
+                # 人數太少不需分隊
+                if total_count <= 4:
+                    # 合併所有成員
+                    all_names = []
+                    for group in groups:
+                        all_names.extend(group)
+                    all_names.extend(individual_members)
+                    
+                    players, mapping_info = self._create_players_from_names(all_names)
+                    
+                    message = f"👥 人數太少，不需分隊\n\n"
+                    message += f"成員名單 ({len(players)}人):\n"
+                    for i, player in enumerate(players, 1):
+                        message += f"{i}. {player['name']}\n"
+                    message += "\n💡 建議直接一起打球！"
+                    
+                    self._send_message(event.reply_token, message)
+                    self._store_team_result([players], context="custom_group")
+                    return
+                
+                # 使用新的群組分隊邏輯生成選項
+                team_options = self._generate_multiple_team_options_with_groups(groups, individual_members, num_options=3)
+                
+                # 為映射信息，需要所有成員的列表
+                all_names = []
+                for group in groups:
+                    all_names.extend(group)
+                all_names.extend(individual_members)
+                _, mapping_info = self._create_players_from_names(all_names)
+                
+                # 暫存分隊選項供使用者選擇
+                self._store_pending_team_selection(user_id, team_options, mapping_info)
+                
+                # 創建分隊選擇 Flex Message
+                selection_flex = self._create_team_selection_flex(team_options, mapping_info, user_id)
+                
+                # 發送分隊選項 Carousel
+                self._send_flex_message(event.reply_token, "🎲 請選擇群組分隊方案", selection_flex)
+                return
+            
+            # 原有的隨機分隊邏輯
             # 解析成員名稱
             member_names = self._parse_member_names(target_text)
             if len(member_names) < 1:
@@ -1444,8 +1515,6 @@ class LineMessageHandler:
             if len(players) < 1:
                 self._send_message(event.reply_token, "❌ 無法創建球員列表")
                 return
-            
-            user_id = event.source.user_id
             
             # 檢查人數是否需要分隊
             if len(players) <= 4:
@@ -1602,6 +1671,10 @@ class LineMessageHandler:
         if not text:
             return False
         
+        # 檢查是否包含方括號（預定義分隊）
+        if '[' in text and ']' in text:
+            return True
+        
         # 檢查是否包含分隔符
         separators = r'[、，,]'
         if re.search(separators, text):
@@ -1631,6 +1704,107 @@ class LineMessageHandler:
         
         self._log_info(f"[PARSE] Extracted member names: {member_names}")
         return member_names
+    
+    def _parse_bracket_teams(self, message_text):
+        """解析包含方括號的預定義分隊格式"""
+        import re
+        
+        # 移除前綴（如 "日："）
+        clean_text = re.sub(r'^[^：:]*[：:]', '', message_text).strip()
+        
+        # 查找所有方括號內容：[成員1,成員2,成員3]
+        bracket_pattern = r'\[([^\]]+)\]'
+        bracket_matches = re.findall(bracket_pattern, clean_text)
+        
+        if not bracket_matches:
+            self._log_info("[BRACKET_PARSE] No valid bracket patterns found")
+            return []
+        
+        predefined_teams = []
+        team_counter = 1
+        
+        for bracket_content in bracket_matches:
+            # 解析方括號內的成員名稱
+            separators = r'[、，,]'
+            member_parts = re.split(separators, bracket_content.strip())
+            
+            team_members = []
+            for part in member_parts:
+                name = part.strip()
+                if name and len(name) >= 1:
+                    team_members.append(name)
+            
+            # 限制每隊最多3人（3vs3）
+            if len(team_members) > 3:
+                self._log_info(f"[BRACKET_PARSE] Team {team_counter} has {len(team_members)} members, limiting to 3")
+                team_members = team_members[:3]
+            
+            if team_members:
+                predefined_teams.append({
+                    'team_name': f'隊伍{team_counter}',
+                    'members': team_members
+                })
+                team_counter += 1
+        
+        self._log_info(f"[BRACKET_PARSE] Extracted {len(predefined_teams)} predefined teams")
+        for i, team in enumerate(predefined_teams):
+            self._log_info(f"[BRACKET_PARSE] Team {i+1}: {team['members']}")
+        
+        return predefined_teams
+    
+    def _parse_bracket_groups(self, message_text):
+        """解析包含方括號的群組格式，支援混合個別成員和群組"""
+        import re
+        
+        # 移除前綴（如 "日："）
+        clean_text = re.sub(r'^[^：:]*[：:]', '', message_text).strip()
+        
+        # 先提取所有方括號內容
+        bracket_pattern = r'\[([^\]]+)\]'
+        bracket_matches = re.findall(bracket_pattern, clean_text)
+        
+        # 移除方括號部分，獲得剩餘的個別成員
+        text_without_brackets = re.sub(bracket_pattern, '', clean_text).strip()
+        
+        groups = []
+        individual_members = []
+        
+        # 解析方括號群組
+        for bracket_content in bracket_matches:
+            separators = r'[、，,]'
+            member_parts = re.split(separators, bracket_content.strip())
+            
+            group_members = []
+            for part in member_parts:
+                name = part.strip()
+                if name and len(name) >= 1:
+                    group_members.append(name)
+            
+            # 限制每個群組最多3人（因為是3vs3）
+            if len(group_members) > 3:
+                self._log_info(f"[GROUP_PARSE] Group has {len(group_members)} members, limiting to 3")
+                group_members = group_members[:3]
+            
+            if group_members:
+                groups.append(group_members)
+        
+        # 解析剩餘的個別成員
+        if text_without_brackets:
+            separators = r'[、，,\s]+'  # 包含空白字符
+            individual_parts = re.split(separators, text_without_brackets)
+            
+            for part in individual_parts:
+                name = part.strip()
+                if name and len(name) >= 1:
+                    individual_members.append(name)
+        
+        self._log_info(f"[GROUP_PARSE] Extracted {len(groups)} groups and {len(individual_members)} individual members")
+        for i, group in enumerate(groups):
+            self._log_info(f"[GROUP_PARSE] Group {i+1}: {group}")
+        if individual_members:
+            self._log_info(f"[GROUP_PARSE] Individual members: {individual_members}")
+        
+        return groups, individual_members
     
     def _create_players_from_names(self, member_names):
         """通過別名映射創建球員列表"""
@@ -1773,6 +1947,112 @@ class LineMessageHandler:
             self._log_info(f"[MULTI_TEAMS] Added fallback option {len(options)}")
         
         self._log_info(f"[MULTI_TEAMS] Generated {len(options)} team options for {total_players} players")
+        return options
+    
+    def _generate_multiple_team_options_with_groups(self, player_groups, individual_players, num_options=3):
+        """生成多組分隊選項，支援方括號群組"""
+        # 將群組轉換為player格式並計算總人數
+        all_player_objects = []
+        
+        # 為每個群組創建player對象
+        group_player_objects = []
+        for group_names in player_groups:
+            group_players, _ = self._create_players_from_names(group_names)
+            group_player_objects.append(group_players)
+            all_player_objects.extend(group_players)
+        
+        # 為個別成員創建player對象
+        individual_player_objects = []
+        if individual_players:
+            individual_player_objects, _ = self._create_players_from_names(individual_players)
+            all_player_objects.extend(individual_player_objects)
+        
+        total_players = len(all_player_objects)
+        
+        # 人數小於等於4時不分隊
+        if total_players <= 4:
+            self._log_info(f"[GROUP_TEAMS] {total_players} players <= 4, returning single option")
+            return [[all_player_objects]]
+        
+        # 計算最佳隊伍分配
+        optimal_teams = self._calculate_optimal_team_distribution(total_players)
+        
+        options = []
+        max_attempts = 50
+        attempts = 0
+        
+        while len(options) < num_options and attempts < max_attempts:
+            attempts += 1
+            
+            # 創建分隊單位列表（群組 + 個別成員）
+            allocation_units = []
+            
+            # 添加群組（作為不可分割的單位）
+            for group_players in group_player_objects:
+                allocation_units.append({
+                    'type': 'group',
+                    'players': group_players,
+                    'size': len(group_players)
+                })
+            
+            # 添加個別成員
+            for player in individual_player_objects:
+                allocation_units.append({
+                    'type': 'individual', 
+                    'players': [player],
+                    'size': 1
+                })
+            
+            # 隨機打亂分配順序
+            random.shuffle(allocation_units)
+            
+            # 分配到隊伍
+            teams = [[] for _ in range(len(optimal_teams))]
+            team_sizes = [0] * len(optimal_teams)
+            
+            for unit in allocation_units:
+                # 找到能容納此單位的隊伍
+                best_team_idx = None
+                for i, max_size in enumerate(optimal_teams):
+                    if team_sizes[i] + unit['size'] <= max_size:
+                        if best_team_idx is None or team_sizes[i] < team_sizes[best_team_idx]:
+                            best_team_idx = i
+                
+                if best_team_idx is not None:
+                    teams[best_team_idx].extend(unit['players'])
+                    team_sizes[best_team_idx] += unit['size']
+                else:
+                    # 無法分配，這個分配方案無效
+                    teams = None
+                    break
+            
+            if teams is None:
+                continue
+                
+            # 過濾掉空隊伍
+            teams = [team for team in teams if len(team) > 0]
+            
+            # 檢查是否重複
+            is_duplicate = False
+            for existing_option in options:
+                if self._is_team_arrangement_same(teams, existing_option):
+                    is_duplicate = True
+                    break
+            
+            if not is_duplicate:
+                options.append(teams)
+                self._log_info(f"[GROUP_TEAMS] Generated option {len(options)}: {[len(team) for team in teams]} teams")
+        
+        # 如果選項不足，填補剩餘
+        while len(options) < num_options and len(options) > 0:
+            options.append(options[0])  # 複製第一個選項
+        
+        # 如果完全無法生成選項，回退到簡單分隊
+        if len(options) == 0:
+            self._log_warning("[GROUP_TEAMS] Could not generate valid team options, falling back to simple teams")
+            return self._generate_multiple_team_options(all_player_objects, num_options)
+        
+        self._log_info(f"[GROUP_TEAMS] Generated {len(options)} team options for {total_players} players with groups")
         return options
     
     def _is_team_arrangement_same(self, teams1, teams2):
