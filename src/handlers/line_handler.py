@@ -124,6 +124,23 @@ class LineMessageHandler:
             )
             return spacer_text
 
+    def _has_brackets(self, text):
+        """檢查文字是否包含方括號（支援半形和全形）"""
+        if not text:
+            return False
+        
+        # 檢查半形方括號
+        has_half_width = '[' in text and ']' in text
+        # 檢查全形方括號
+        has_full_width = '［' in text and '］' in text
+        
+        return has_half_width or has_full_width
+    
+    def _get_bracket_pattern(self):
+        """獲取支援半形和全形方括號的正則表達式模式"""
+        # 支援半形 [] 和全形 ［］
+        return r'[\[［]([^\]］]+)[\]］]'
+
     def _log_info(self, message):
         """安全的 info 日誌"""
         if self.logger:
@@ -1429,14 +1446,15 @@ class LineMessageHandler:
                 self._send_message(event.reply_token,
                     "❌ 無法識別成員名單\n\n"
                     "請確保成員名稱用逗號、頓號分隔\n"
-                    "或使用方括號預設分隊：[隊員1,隊員2] [隊員3,隊員4]\n"
+                    "或使用方括號群組分隊：[隊友1,隊友2] 個別成員\n"
+                    "支援半形 [] 或全形 ［］ 方括號\n"
                     "例如：🥛、凱、豪、金、kin、勇")
                 return
             
             user_id = event.source.user_id
             
-            # 檢查是否使用方括號群組分隊
-            if '[' in target_text and ']' in target_text:
+            # 檢查是否使用方括號群組分隊（支援半形和全形）
+            if self._has_brackets(target_text):
                 # 使用新的群組解析
                 groups, individual_members = self._parse_bracket_groups(target_text)
                 
@@ -1444,6 +1462,7 @@ class LineMessageHandler:
                     self._send_message(event.reply_token, 
                         "❌ 無法解析方括號群組格式\n\n"
                         "請使用正確格式：[隊友1,隊友2] 個別成員1 個別成員2\n"
+                        "支援半形 [] 或全形 ［］ 方括號\n"
                         "每個群組最多3人")
                     return
                 
@@ -1671,8 +1690,8 @@ class LineMessageHandler:
         if not text:
             return False
         
-        # 檢查是否包含方括號（預定義分隊）
-        if '[' in text and ']' in text:
+        # 檢查是否包含方括號（支援半形和全形）
+        if self._has_brackets(text):
             return True
         
         # 檢查是否包含分隔符
@@ -1706,14 +1725,14 @@ class LineMessageHandler:
         return member_names
     
     def _parse_bracket_teams(self, message_text):
-        """解析包含方括號的預定義分隊格式"""
+        """解析包含方括號的預定義分隊格式（支援半形和全形方括號）"""
         import re
         
         # 移除前綴（如 "日："）
         clean_text = re.sub(r'^[^：:]*[：:]', '', message_text).strip()
         
-        # 查找所有方括號內容：[成員1,成員2,成員3]
-        bracket_pattern = r'\[([^\]]+)\]'
+        # 查找所有方括號內容：[成員1,成員2,成員3] 或 ［成員1,成員2,成員3］
+        bracket_pattern = self._get_bracket_pattern()
         bracket_matches = re.findall(bracket_pattern, clean_text)
         
         if not bracket_matches:
@@ -1753,14 +1772,14 @@ class LineMessageHandler:
         return predefined_teams
     
     def _parse_bracket_groups(self, message_text):
-        """解析包含方括號的群組格式，支援混合個別成員和群組"""
+        """解析包含方括號的群組格式，支援混合個別成員和群組（支援半形和全形方括號）"""
         import re
         
         # 移除前綴（如 "日："）
         clean_text = re.sub(r'^[^：:]*[：:]', '', message_text).strip()
         
-        # 先提取所有方括號內容
-        bracket_pattern = r'\[([^\]]+)\]'
+        # 先提取所有方括號內容（支援半形和全形）
+        bracket_pattern = self._get_bracket_pattern()
         bracket_matches = re.findall(bracket_pattern, clean_text)
         
         # 移除方括號部分，獲得剩餘的個別成員
