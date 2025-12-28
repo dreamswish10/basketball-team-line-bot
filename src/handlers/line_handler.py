@@ -1759,9 +1759,11 @@ class LineMessageHandler:
             if total_mapping_info['identified'] or total_mapping_info['strangers']:
                 success_message += "📋 成員映射:\n"
                 if total_mapping_info['identified']:
-                    success_message += f"已識別: {', '.join(total_mapping_info['identified'])}\n"
+                    identified_strs = [f"{item['input']}→{item['mapped']}" for item in total_mapping_info['identified']]
+                    success_message += f"已識別: {', '.join(identified_strs)}\n"
                 if total_mapping_info['strangers']:
-                    success_message += f"新成員: {', '.join(total_mapping_info['strangers'])}\n"
+                    stranger_strs = [f"{item['input']}→{item['stranger']}" for item in total_mapping_info['strangers']]
+                    success_message += f"新成員: {', '.join(stranger_strs)}\n"
             
             self._send_message(event.reply_token, success_message)
             self._log_info(f"[RECORD] Successfully recorded teams for {len(teams_with_players)} teams")
