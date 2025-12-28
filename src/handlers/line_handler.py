@@ -260,6 +260,9 @@ class LineMessageHandler:
             elif message_text.startswith('/remove_user') or message_text.startswith('移除使用者'):
                 self._log_info(f"[COMMAND] Matched: /remove_user, User: {user_id}")
                 self._handle_remove_user_command(event, message_text)
+            elif message_text.startswith('/record') or message_text.startswith('記錄') or message_text.startswith('/記錄'):
+                self._log_info(f"[COMMAND] Matched: /record, User: {user_id}")
+                self._handle_record_command(event, message_text)
             else:
                 self._log_warning(f"[UNKNOWN] Command not recognized: '{message_text}', User: {user_id}")
                 self._handle_unknown_command(event, is_group)
@@ -499,14 +502,22 @@ class LineMessageHandler:
         message += "🔸 /profile\n"
         message += "   查看個人資料\n"
         message += "🔸 /delete\n"
-        message += "   刪除個人資料\n\n"
+        message += "   刪除個人資料\n"
+        message += "🔸 /分隊 成員名單\n"
+        message += "   自訂分隊 (支援方括號群組)\n"
+        message += "🔸 /record 隊伍1:成員 隊伍2:成員\n"
+        message += "   手動記錄分隊結果\n"
+        message += "🔸 /查詢\n"
+        message += "   查看個人組隊記錄\n\n"
         message += "📖 使用範例：\n"
         if is_group:
             message += "• /group_team 2 (群組快速分隊)\n"
         message += "• /register 小明 8 7 9\n"
         message += "• /add_user 小華\n"
         message += "• /remove_user 小李\n"
-        message += "• /team 3\n\n"
+        message += "• /team 3\n"
+        message += "• /分隊 [小明,小華] 小李 小強\n"
+        message += "• /record 隊伍1:小明,小華 隊伍2:小李,小強\n\n"
         message += "⚠️ 注意事項：\n"
         message += "• 技能值範圍：1-10\n"
         message += "• 群組分隊會使用預設技能值\n"
@@ -1683,6 +1694,163 @@ class LineMessageHandler:
         except Exception as e:
             self._log_error(f"Error in remove_user command: {e}")
             self._send_message(event.reply_token, "❌ 移除使用者失敗，請稍後再試")
+    
+    def _handle_record_command(self, event, message_text):
+        """處理手動記錄分隊結果指令"""
+        try:
+            # 提取記錄內容
+            import re
+            
+            # 移除指令前綴
+            content = re.sub(r'^(/record|記錄|/記錄)\s*', '', message_text).strip()
+            
+            if not content:
+                self._send_message(event.reply_token, 
+                    "❌ 請提供分隊結果\n\n"
+                    "使用格式：\n"
+                    "🔸 /record 隊伍1:小明,小華,小李 隊伍2:阿強,阿勇,阿豪\n"
+                    "🔸 記錄 team1:player1,player2 team2:player3,player4")
+                return
+            
+            # 解析分隊結果
+            teams_data = self._parse_record_input(content)
+            
+            if not teams_data:
+                self._send_message(event.reply_token, 
+                    "❌ 無法解析分隊格式\n\n"
+                    "請使用正確格式：隊伍名:成員1,成員2 隊伍名:成員3,成員4\n"
+                    "例如：隊伍1:小明,小華 隊伍2:阿強,阿勇")
+                return
+            
+            # 驗證分隊結果
+            validation_error = self._validate_teams_data(teams_data)
+            if validation_error:
+                self._send_message(event.reply_token, validation_error)
+                return
+            
+            # 轉換為球員對象並存儲
+            teams_with_players = []
+            total_mapping_info = {'identified': [], 'strangers': []}
+            
+            for team_data in teams_data:
+                team_players, team_mapping = self._create_players_from_names(team_data['members'])
+                if team_players:
+                    teams_with_players.append(team_players)
+                    # 合併映射資訊
+                    total_mapping_info['identified'].extend(team_mapping['identified'])
+                    total_mapping_info['strangers'].extend(team_mapping['strangers'])
+            
+            if not teams_with_players:
+                self._send_message(event.reply_token, "❌ 無法創建有效的分隊結果")
+                return
+            
+            # 儲存到資料庫
+            self._store_team_result(teams_with_players, context="manual_record")
+            
+            # 創建成功回覆訊息
+            success_message = "✅ 分隊結果已成功記錄\n\n"
+            for i, team in enumerate(teams_with_players, 1):
+                success_message += f"隊伍{i} ({len(team)}人):\n"
+                for player in team:
+                    success_message += f"• {player['name']}\n"
+                success_message += "\n"
+            
+            # 添加映射資訊
+            if total_mapping_info['identified'] or total_mapping_info['strangers']:
+                success_message += "📋 成員映射:\n"
+                if total_mapping_info['identified']:
+                    success_message += f"已識別: {', '.join(total_mapping_info['identified'])}\n"
+                if total_mapping_info['strangers']:
+                    success_message += f"新成員: {', '.join(total_mapping_info['strangers'])}\n"
+            
+            self._send_message(event.reply_token, success_message)
+            self._log_info(f"[RECORD] Successfully recorded teams for {len(teams_with_players)} teams")
+            
+        except Exception as e:
+            self._log_error(f"Error in record command: {e}")
+            self._send_message(event.reply_token, "❌ 記錄分隊結果失敗，請稍後再試")
+    
+    def _parse_record_input(self, input_text):
+        """解析記錄指令的輸入格式"""
+        import re
+        
+        # 支援格式：隊伍1:成員1,成員2 隊伍2:成員3,成員4
+        # 或者：team1:player1,player2 team2:player3,player4
+        teams_data = []
+        
+        # 使用正則表達式分割隊伍
+        # 匹配格式：隊伍名:成員列表
+        team_pattern = r'([^:]+):([^:]*?)(?=\s+[^:,]+:|$)'
+        team_matches = re.findall(team_pattern, input_text)
+        
+        if not team_matches:
+            self._log_info("[RECORD_PARSE] No team pattern matches found")
+            return []
+        
+        for team_name, members_str in team_matches:
+            team_name = team_name.strip()
+            members_str = members_str.strip()
+            
+            if not team_name or not members_str:
+                continue
+            
+            # 解析成員名稱
+            separators = r'[、，,]'
+            member_parts = re.split(separators, members_str)
+            
+            members = []
+            for part in member_parts:
+                name = part.strip()
+                if name and len(name) >= 1:
+                    members.append(name)
+            
+            if members:
+                teams_data.append({
+                    'team_name': team_name,
+                    'members': members
+                })
+        
+        self._log_info(f"[RECORD_PARSE] Parsed {len(teams_data)} teams: {[(team['team_name'], team['members']) for team in teams_data]}")
+        return teams_data
+    
+    def _validate_teams_data(self, teams_data):
+        """驗證分隊資料"""
+        if not teams_data:
+            return "❌ 沒有找到有效的分隊資料"
+        
+        if len(teams_data) < 2:
+            return "❌ 至少需要2個隊伍"
+        
+        total_members = 0
+        for team in teams_data:
+            team_size = len(team['members'])
+            total_members += team_size
+            
+            if team_size == 0:
+                return f"❌ 隊伍 '{team['team_name']}' 沒有成員"
+            
+            if team_size > 3:
+                return f"❌ 隊伍 '{team['team_name']}' 超過3人限制 ({team_size}人)"
+        
+        if total_members < 2:
+            return "❌ 總人數太少，至少需要2人"
+        
+        # 檢查成員名稱重複
+        all_members = []
+        for team in teams_data:
+            all_members.extend(team['members'])
+        
+        duplicates = []
+        seen = set()
+        for member in all_members:
+            if member in seen:
+                duplicates.append(member)
+            seen.add(member)
+        
+        if duplicates:
+            return f"❌ 發現重複的成員: {', '.join(duplicates)}"
+        
+        return None  # 無錯誤
     
     def _is_valid_team_content(self, text):
         """檢查文字是否包含有效的成員名單格式"""
