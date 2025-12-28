@@ -141,6 +141,30 @@ class LineMessageHandler:
         # 支援半形 [] 和全形 ［］
         return r'[\[［]([^\]］]+)[\]］]'
 
+    def _remove_duplicate_names(self, names, case_sensitive=True):
+        """移除名稱列表中的重複項，保持順序"""
+        if not names:
+            return []
+        
+        seen = set()
+        unique_names = []
+        duplicates_removed = []
+        
+        for name in names:
+            # 決定比較用的鍵
+            compare_key = name if case_sensitive else name.lower()
+            
+            if compare_key not in seen:
+                seen.add(compare_key)
+                unique_names.append(name)
+            else:
+                duplicates_removed.append(name)
+        
+        if duplicates_removed:
+            self._log_info(f"[DEDUP] Removed duplicate names: {duplicates_removed}")
+        
+        return unique_names
+
     def _log_info(self, message):
         """安全的 info 日誌"""
         if self.logger:
@@ -1891,8 +1915,14 @@ class LineMessageHandler:
             if name and len(name) >= 1:  # 最少1個字符
                 member_names.append(name)
         
+        # 移除重複名稱
+        unique_member_names = self._remove_duplicate_names(member_names, case_sensitive=False)
+        
         self._log_info(f"[PARSE] Extracted member names: {member_names}")
-        return member_names
+        if len(unique_member_names) != len(member_names):
+            self._log_info(f"[PARSE] After deduplication: {unique_member_names}")
+        
+        return unique_member_names
     
     def _parse_bracket_teams(self, message_text):
         """解析包含方括號的預定義分隊格式（支援半形和全形方括號）"""
@@ -1974,8 +2004,11 @@ class LineMessageHandler:
                 self._log_info(f"[GROUP_PARSE] Group has {len(group_members)} members, limiting to 3")
                 group_members = group_members[:3]
             
-            if group_members:
-                groups.append(group_members)
+            # 移除群組內重複名稱
+            unique_group_members = self._remove_duplicate_names(group_members, case_sensitive=False)
+            
+            if unique_group_members:
+                groups.append(unique_group_members)
         
         # 解析剩餘的個別成員
         if text_without_brackets:
@@ -1987,13 +2020,33 @@ class LineMessageHandler:
                 if name and len(name) >= 1:
                     individual_members.append(name)
         
-        self._log_info(f"[GROUP_PARSE] Extracted {len(groups)} groups and {len(individual_members)} individual members")
+        # 移除個別成員列表中的重複名稱
+        unique_individual_members = self._remove_duplicate_names(individual_members, case_sensitive=False)
+        
+        # 移除個別成員中與群組成員重複的名稱（群組優先）
+        all_group_members = set()
+        for group in groups:
+            for member in group:
+                all_group_members.add(member.lower())
+        
+        final_individual_members = []
+        cross_duplicates_removed = []
+        for member in unique_individual_members:
+            if member.lower() not in all_group_members:
+                final_individual_members.append(member)
+            else:
+                cross_duplicates_removed.append(member)
+        
+        if cross_duplicates_removed:
+            self._log_info(f"[GROUP_PARSE] Removed individual members already in groups: {cross_duplicates_removed}")
+        
+        self._log_info(f"[GROUP_PARSE] Extracted {len(groups)} groups and {len(final_individual_members)} individual members")
         for i, group in enumerate(groups):
             self._log_info(f"[GROUP_PARSE] Group {i+1}: {group}")
-        if individual_members:
-            self._log_info(f"[GROUP_PARSE] Individual members: {individual_members}")
+        if final_individual_members:
+            self._log_info(f"[GROUP_PARSE] Individual members: {final_individual_members}")
         
-        return groups, individual_members
+        return groups, final_individual_members
     
     def _create_players_from_names(self, member_names):
         """通過別名映射創建球員列表"""
@@ -2035,8 +2088,23 @@ class LineMessageHandler:
             }
             players.append(player)
         
-        self._log_info(f"[PLAYERS] Created {len(players)} players for team generation")
-        return players, mapping_info
+        # 基於 user_id 去除重複球員
+        unique_players = []
+        seen_user_ids = set()
+        duplicate_players_removed = []
+        
+        for player in players:
+            if player['user_id'] not in seen_user_ids:
+                seen_user_ids.add(player['user_id'])
+                unique_players.append(player)
+            else:
+                duplicate_players_removed.append(player['input_name'])
+        
+        if duplicate_players_removed:
+            self._log_info(f"[PLAYERS_DEDUP] Removed duplicate players by user_id: {duplicate_players_removed}")
+        
+        self._log_info(f"[PLAYERS] Created {len(unique_players)} unique players for team generation")
+        return unique_players, mapping_info
     
     def _generate_simple_teams(self, players, num_teams=2):
         """智能分隊方法：考慮人數限制和隊伍大小"""
