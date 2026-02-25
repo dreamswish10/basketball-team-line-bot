@@ -267,6 +267,9 @@ class LineMessageHandler:
             elif message_text == '開始':
                 self._log_info(f"[COMMAND] Matched: 開始, User: {user_id}")
                 self._handle_start_command(event)
+            elif message_text.startswith('/權重分隊') or message_text.startswith('權重分隊'):
+                self._log_info(f"[COMMAND] Matched: /權重分隊, User: {user_id}")
+                self._handle_weighted_team_command(event, message_text)
             elif message_text.startswith('/分隊') or message_text.startswith('分隊'):
                 self._log_info(f"[COMMAND] Matched: /分隊, User: {user_id}")
                 self._handle_custom_team_command(event, message_text)
@@ -529,6 +532,8 @@ class LineMessageHandler:
         message += "   刪除個人資料\n"
         message += "🔸 /分隊 成員名單\n"
         message += "   自訂分隊 (支援方括號群組)\n"
+        message += "🔸 /權重分隊 成員名單\n"
+        message += "   避免與最近5次重複的分隊\n"
         message += "🔸 /record 隊伍1:成員 隊伍2:成員\n"
         message += "   手動記錄分隊結果\n"
         message += "🔸 /查詢\n"
@@ -541,6 +546,7 @@ class LineMessageHandler:
         message += "• /remove_user 小李\n"
         message += "• /team 3\n"
         message += "• /分隊 [小明,小華] 小李 小強\n"
+        message += "• /權重分隊 小明,小華,小李,小強\n"
         message += "• /record 隊伍1:小明,小華 隊伍2:小李,小強\n\n"
         message += "⚠️ 注意事項：\n"
         message += "• 技能值範圍：1-10\n"
@@ -1600,7 +1606,163 @@ class LineMessageHandler:
         except Exception as e:
             self._log_error(f"Error in custom team command: {e}")
             self._send_message(event.reply_token, "❌ 分隊處理失敗，請稍後再試")
-    
+
+    def _handle_weighted_team_command(self, event, message_text):
+        """處理權重分隊指令 - 避免與最近歷史重複"""
+        import re
+
+        try:
+            # 提取要處理的內容
+            target_text = None
+
+            # 1. 先檢查是否有回覆訊息
+            reply_content = self._extract_reply_content(event)
+            if reply_content:
+                target_text = reply_content
+                self._log_info(f"[WEIGHTED_CMD] Using reply content: {target_text[:50]}...")
+            else:
+                # 2. 檢查指令後是否有內容
+                # 移除 /權重分隊 或 權重分隊 前綴
+                clean_command = re.sub(r'^/?權重分隊\s*', '', message_text).strip()
+                if clean_command:
+                    target_text = clean_command
+                    self._log_info(f"[WEIGHTED_CMD] Using command content: {target_text[:50]}...")
+                else:
+                    # 3. 沒有內容可處理
+                    self._send_message(event.reply_token,
+                        "❌ 請提供成員名單\n\n"
+                        "使用方式：\n"
+                        "🔸 /權重分隊 🥛、凱、豪、金\n"
+                        "🔸 回覆包含成員名單的訊息，然後輸入 /權重分隊\n\n"
+                        "💡 權重分隊會避免與最近5次分隊結果相同")
+                    return
+
+            # 檢查內容是否包含成員名稱分隔符
+            if not self._is_valid_team_content(target_text):
+                self._send_message(event.reply_token,
+                    "❌ 無法識別成員名單\n\n"
+                    "請確保成員名稱用逗號、頓號分隔\n"
+                    "或使用方括號群組分隊：[隊友1,隊友2] 個別成員\n"
+                    "支援半形 [] 或全形 ［］ 方括號\n"
+                    "例如：🥛、凱、豪、金、kin、勇")
+                return
+
+            user_id = event.source.user_id
+
+            # 檢查是否使用方括號群組分隊（支援半形和全形）
+            if self._has_brackets(target_text):
+                # 使用新的群組解析
+                groups, individual_members = self._parse_bracket_groups(target_text)
+
+                if not groups and not individual_members:
+                    self._send_message(event.reply_token,
+                        "❌ 無法解析方括號群組格式\n\n"
+                        "請使用正確格式：[隊友1,隊友2] 個別成員1 個別成員2\n"
+                        "支援半形 [] 或全形 ［］ 方括號\n"
+                        "每個群組最多3人")
+                    return
+
+                # 檢查是否所有群組都超過隊伍限制
+                invalid_groups = [group for group in groups if len(group) > 3]
+                if invalid_groups:
+                    self._send_message(event.reply_token,
+                        f"❌ 發現超過3人的群組: {invalid_groups}\n\n"
+                        "每個群組最多3人（3vs3比賽限制）")
+                    return
+
+                # 計算總人數
+                total_count = sum(len(group) for group in groups) + len(individual_members)
+
+                if total_count < 1:
+                    self._send_message(event.reply_token, "❌ 請至少輸入 1 位成員")
+                    return
+
+                # 人數太少不需分隊
+                if total_count <= 4:
+                    # 合併所有成員
+                    all_names = []
+                    for group in groups:
+                        all_names.extend(group)
+                    all_names.extend(individual_members)
+
+                    players, mapping_info = self._create_players_from_names(all_names)
+
+                    message = f"👥 人數太少，不需分隊\n\n"
+                    message += f"成員名單 ({len(players)}人):\n"
+                    for i, player in enumerate(players, 1):
+                        message += f"{i}. {player['name']}\n"
+                    message += "\n💡 建議直接一起打球！"
+
+                    self._send_message(event.reply_token, message)
+                    self._store_team_result([players], context="weighted_group")
+                    return
+
+                # 獲取上次分隊記錄（在產生新分隊前）
+                last_attendance = self._get_last_team_attendance()
+
+                # 使用權重分隊邏輯生成選項（避免與歷史重複）- 只生成1個最佳方案
+                team_options = self._generate_weighted_team_options_with_groups(groups, individual_members, num_options=1, avoid_recent_count=5)
+
+                # 直接使用第一個（最佳）選項
+                selected_teams = team_options[0]
+
+                # 儲存分隊結果到資料庫
+                self._store_team_result(selected_teams, context="weighted_group")
+
+                # 格式化並發送結果訊息（包含上次分隊比較）
+                result_message = self._format_weighted_team_result(selected_teams, last_attendance)
+                self._send_message(event.reply_token, result_message)
+                return
+
+            # 無方括號的權重分隊邏輯
+            # 解析成員名稱
+            member_names = self._parse_member_names(target_text)
+            if len(member_names) < 1:
+                self._send_message(event.reply_token, "❌ 請至少輸入 1 位成員名稱")
+                return
+
+            # 通過別名映射創建球員列表
+            players, mapping_info = self._create_players_from_names(member_names)
+
+            if len(players) < 1:
+                self._send_message(event.reply_token, "❌ 無法創建球員列表")
+                return
+
+            # 檢查人數是否需要分隊
+            if len(players) <= 4:
+                # 人數少，不需分隊，發送簡單文字訊息
+                message = f"👥 人數太少，不需分隊\n\n"
+                message += f"成員名單 ({len(players)}人):\n"
+                for i, player in enumerate(players, 1):
+                    message += f"{i}. {player['name']}\n"
+                message += "\n💡 建議直接一起打球！"
+
+                self._send_message(event.reply_token, message)
+
+                # 直接儲存到資料庫（不需選擇）
+                self._store_team_result([players], context="weighted")
+                return
+
+            # 獲取上次分隊記錄（在產生新分隊前）
+            last_attendance = self._get_last_team_attendance()
+
+            # 使用權重分隊邏輯生成選項（將所有成員視為個別成員，無群組）- 只生成1個最佳方案
+            team_options = self._generate_weighted_team_options_with_groups([], member_names, num_options=1, avoid_recent_count=5)
+
+            # 直接使用第一個（最佳）選項
+            selected_teams = team_options[0]
+
+            # 儲存分隊結果到資料庫
+            self._store_team_result(selected_teams, context="weighted")
+
+            # 格式化並發送結果訊息（包含上次分隊比較）
+            result_message = self._format_weighted_team_result(selected_teams, last_attendance)
+            self._send_message(event.reply_token, result_message)
+
+        except Exception as e:
+            self._log_error(f"Error in weighted team command: {e}")
+            self._send_message(event.reply_token, "❌ 權重分隊處理失敗，請稍後再試")
+
     def _handle_query_command(self, event, user_id):
         """處理查詢指令，顯示用戶近五次組隊記錄"""
         try:
@@ -2207,43 +2369,50 @@ class LineMessageHandler:
         return options
     
     def _generate_multiple_team_options_with_groups(self, player_groups, individual_players, num_options=3):
-        """生成多組分隊選項，支援方括號群組"""
+        """生成多組分隊選項，支援方括號群組
+
+        Args:
+            player_groups: 群組列表
+            individual_players: 個別成員列表
+            num_options: 要生成的選項數量
+        """
         # 將群組轉換為player格式並計算總人數
         all_player_objects = []
-        
+
         # 為每個群組創建player對象
         group_player_objects = []
         for group_names in player_groups:
             group_players, _ = self._create_players_from_names(group_names)
             group_player_objects.append(group_players)
             all_player_objects.extend(group_players)
-        
+
         # 為個別成員創建player對象
         individual_player_objects = []
         if individual_players:
             individual_player_objects, _ = self._create_players_from_names(individual_players)
             all_player_objects.extend(individual_player_objects)
-        
+
         total_players = len(all_player_objects)
-        
+
         # 人數小於等於4時不分隊
         if total_players <= 4:
             self._log_info(f"[GROUP_TEAMS] {total_players} players <= 4, returning single option")
             return [[all_player_objects]]
-        
+
         # 計算最佳隊伍分配
         optimal_teams = self._calculate_optimal_team_distribution(total_players)
-        
+
+        # 生成候選方案
         options = []
-        max_attempts = 50
+        max_attempts = num_options * 10
         attempts = 0
-        
+
         while len(options) < num_options and attempts < max_attempts:
             attempts += 1
-            
+
             # 創建分隊單位列表（群組 + 個別成員）
             allocation_units = []
-            
+
             # 添加群組（作為不可分割的單位）
             for group_players in group_player_objects:
                 allocation_units.append({
@@ -2251,22 +2420,22 @@ class LineMessageHandler:
                     'players': group_players,
                     'size': len(group_players)
                 })
-            
+
             # 添加個別成員
             for player in individual_player_objects:
                 allocation_units.append({
-                    'type': 'individual', 
+                    'type': 'individual',
                     'players': [player],
                     'size': 1
                 })
-            
+
             # 隨機打亂分配順序
             random.shuffle(allocation_units)
-            
+
             # 分配到隊伍
             teams = [[] for _ in range(len(optimal_teams))]
             team_sizes = [0] * len(optimal_teams)
-            
+
             for unit in allocation_units:
                 # 找到能容納此單位的隊伍
                 best_team_idx = None
@@ -2274,7 +2443,7 @@ class LineMessageHandler:
                     if team_sizes[i] + unit['size'] <= max_size:
                         if best_team_idx is None or team_sizes[i] < team_sizes[best_team_idx]:
                             best_team_idx = i
-                
+
                 if best_team_idx is not None:
                     teams[best_team_idx].extend(unit['players'])
                     team_sizes[best_team_idx] += unit['size']
@@ -2282,36 +2451,165 @@ class LineMessageHandler:
                     # 無法分配，這個分配方案無效
                     teams = None
                     break
-            
+
             if teams is None:
                 continue
-                
+
             # 過濾掉空隊伍
             teams = [team for team in teams if len(team) > 0]
-            
-            # 檢查是否重複
+
+            # 檢查是否與已有選項重複
             is_duplicate = False
-            for existing_option in options:
-                if self._is_team_arrangement_same(teams, existing_option):
+            for existing_teams in options:
+                if self._is_team_arrangement_same(teams, existing_teams):
                     is_duplicate = True
                     break
-            
+
             if not is_duplicate:
                 options.append(teams)
                 self._log_info(f"[GROUP_TEAMS] Generated option {len(options)}: {[len(team) for team in teams]} teams")
-        
+
         # 如果選項不足，填補剩餘
         while len(options) < num_options and len(options) > 0:
             options.append(options[0])  # 複製第一個選項
-        
+
         # 如果完全無法生成選項，回退到簡單分隊
         if len(options) == 0:
             self._log_warning("[GROUP_TEAMS] Could not generate valid team options, falling back to simple teams")
             return self._generate_multiple_team_options(all_player_objects, num_options)
-        
+
         self._log_info(f"[GROUP_TEAMS] Generated {len(options)} team options for {total_players} players with groups")
         return options
-    
+
+    def _generate_weighted_team_options_with_groups(self, player_groups, individual_players, num_options=3, avoid_recent_count=5):
+        """生成多組分隊選項，支援方括號群組，並避免與最近歷史重複
+
+        Args:
+            player_groups: 群組列表
+            individual_players: 個別成員列表
+            num_options: 要生成的選項數量
+            avoid_recent_count: 要避免的最近歷史記錄數量
+        """
+        # 將群組轉換為player格式並計算總人數
+        all_player_objects = []
+
+        # 為每個群組創建player對象
+        group_player_objects = []
+        for group_names in player_groups:
+            group_players, _ = self._create_players_from_names(group_names)
+            group_player_objects.append(group_players)
+            all_player_objects.extend(group_players)
+
+        # 為個別成員創建player對象
+        individual_player_objects = []
+        if individual_players:
+            individual_player_objects, _ = self._create_players_from_names(individual_players)
+            all_player_objects.extend(individual_player_objects)
+
+        total_players = len(all_player_objects)
+
+        # 人數小於等於4時不分隊
+        if total_players <= 4:
+            self._log_info(f"[WEIGHTED_TEAMS] {total_players} players <= 4, returning single option")
+            return [[all_player_objects]]
+
+        # 計算最佳隊伍分配
+        optimal_teams = self._calculate_optimal_team_distribution(total_players)
+
+        # 獲取歷史分隊記錄
+        history = self._get_recent_team_history(avoid_recent_count)
+        self._log_info(f"[WEIGHTED_TEAMS] Using {len(history)} historical records to avoid similar teams")
+
+        # 生成候選方案 (收集更多候選以便篩選)
+        candidates = []  # [(teams, similarity_score), ...]
+        max_attempts = num_options * 10  # 生成更多候選
+        attempts = 0
+
+        while len(candidates) < num_options * 3 and attempts < max_attempts:
+            attempts += 1
+
+            # 創建分隊單位列表（群組 + 個別成員）
+            allocation_units = []
+
+            # 添加群組（作為不可分割的單位）
+            for group_players in group_player_objects:
+                allocation_units.append({
+                    'type': 'group',
+                    'players': group_players,
+                    'size': len(group_players)
+                })
+
+            # 添加個別成員
+            for player in individual_player_objects:
+                allocation_units.append({
+                    'type': 'individual',
+                    'players': [player],
+                    'size': 1
+                })
+
+            # 隨機打亂分配順序
+            random.shuffle(allocation_units)
+
+            # 分配到隊伍
+            teams = [[] for _ in range(len(optimal_teams))]
+            team_sizes = [0] * len(optimal_teams)
+
+            for unit in allocation_units:
+                # 找到能容納此單位的隊伍
+                best_team_idx = None
+                for i, max_size in enumerate(optimal_teams):
+                    if team_sizes[i] + unit['size'] <= max_size:
+                        if best_team_idx is None or team_sizes[i] < team_sizes[best_team_idx]:
+                            best_team_idx = i
+
+                if best_team_idx is not None:
+                    teams[best_team_idx].extend(unit['players'])
+                    team_sizes[best_team_idx] += unit['size']
+                else:
+                    # 無法分配，這個分配方案無效
+                    teams = None
+                    break
+
+            if teams is None:
+                continue
+
+            # 過濾掉空隊伍
+            teams = [team for team in teams if len(team) > 0]
+
+            # 檢查是否與已有候選重複
+            is_duplicate = False
+            for existing_teams, _ in candidates:
+                if self._is_team_arrangement_same(teams, existing_teams):
+                    is_duplicate = True
+                    break
+
+            if not is_duplicate:
+                # 計算與歷史記錄的相似度分數
+                similarity_score = self._calculate_team_similarity_score(teams, history)
+                candidates.append((teams, similarity_score))
+                self._log_info(f"[WEIGHTED_TEAMS] Generated candidate {len(candidates)}: {[len(team) for team in teams]} teams, similarity_score={similarity_score}")
+
+        # 按相似度分數排序，選擇分數最低的（與歷史最不相似）
+        candidates.sort(key=lambda x: x[1])
+
+        # 選擇最佳選項
+        options = []
+        for teams, score in candidates[:num_options]:
+            options.append(teams)
+            self._log_info(f"[WEIGHTED_TEAMS] Selected option with similarity_score={score}")
+
+        # 如果選項不足，填補剩餘
+        while len(options) < num_options and len(options) > 0:
+            options.append(options[0])  # 複製第一個選項
+
+        # 如果完全無法生成選項，回退到簡單分隊
+        if len(options) == 0:
+            self._log_warning("[WEIGHTED_TEAMS] Could not generate valid team options, falling back to simple teams")
+            return self._generate_multiple_team_options(all_player_objects, num_options)
+
+        self._log_info(f"[WEIGHTED_TEAMS] Generated {len(options)} team options for {total_players} players with groups (history-aware)")
+        return options
+
     def _is_team_arrangement_same(self, teams1, teams2):
         """檢查兩組分隊安排是否相同"""
         if len(teams1) != len(teams2):
@@ -2334,7 +2632,92 @@ class LineMessageHandler:
         teams2_sets.sort(key=lambda s: tuple(sorted(s)))
         
         return teams1_sets == teams2_sets
-    
+
+    def _get_recent_team_history(self, limit=5):
+        """獲取最近 N 次的分隊記錄，轉換為可比較的格式
+
+        Args:
+            limit: 要獲取的歷史記錄數量
+
+        Returns:
+            List[frozenset]: 每個元素是一次分隊記錄，
+                            格式為 frozenset of frozensets (每隊的 user_id 組合)
+        """
+        try:
+            recent_attendances = self.attendances_repo.get_recent_attendances(limit)
+            history = []
+
+            for attendance in recent_attendances:
+                teams = attendance.get('teams', [])
+                if not teams:
+                    continue
+
+                # 將每次分隊轉換為 frozenset of frozensets
+                team_sets = []
+                for team in teams:
+                    members = team.get('members', [])
+                    # 使用 userId 作為識別，如果沒有則使用 name
+                    member_ids = frozenset(
+                        member.get('userId', member.get('name', ''))
+                        for member in members
+                    )
+                    if member_ids:  # 跳過空隊伍
+                        team_sets.append(member_ids)
+
+                if team_sets:
+                    history.append(frozenset(team_sets))
+
+            self._log_info(f"[HISTORY] Retrieved {len(history)} recent team records")
+            return history
+
+        except Exception as e:
+            self._log_error(f"[HISTORY] Error getting recent team history: {e}")
+            return []
+
+    def _calculate_team_similarity_score(self, teams, history):
+        """計算分隊方案與歷史記錄的相似度分數
+
+        Args:
+            teams: 當前分隊方案 (list of lists of player dicts)
+            history: 歷史記錄 (list of frozensets)
+
+        Returns:
+            int: 相似度分數 (0=完全不同, 越高越相似)
+                 - 完全相同的記錄數 * 100
+                 - 加上相同隊伍組合數
+        """
+        if not history:
+            return 0
+
+        # 將當前分隊轉換為可比較的格式
+        current_team_sets = []
+        for team in teams:
+            member_ids = frozenset(
+                player.get('user_id', player.get('name', ''))
+                for player in team
+            )
+            if member_ids:
+                current_team_sets.append(member_ids)
+
+        current_arrangement = frozenset(current_team_sets)
+
+        score = 0
+
+        for past_arrangement in history:
+            # 檢查是否完全相同
+            if current_arrangement == past_arrangement:
+                score += 100  # 完全相同給很高的懲罰分數
+                self._log_info(f"[SIMILARITY] Found exact match with history")
+                continue
+
+            # 計算相同的隊伍組合數量
+            same_teams = len(current_arrangement & past_arrangement)
+            if same_teams > 0:
+                score += same_teams
+                self._log_info(f"[SIMILARITY] Found {same_teams} same team(s) with a history record")
+
+        return score
+
     def _calculate_optimal_team_distribution(self, total_players):
         """計算最佳隊伍分配方式（每隊最多3人）"""
         if total_players <= 4:
@@ -2678,7 +3061,39 @@ class LineMessageHandler:
         except Exception as e:
             self._log_error(f"[DB_STORE] Error storing team result: {e}")
             return False
-    
+
+    def _get_last_team_attendance(self):
+        """獲取最近一次分隊記錄的完整資料"""
+        try:
+            recent = self.attendances_repo.get_recent_attendances(1)
+            return recent[0] if recent else None
+        except Exception as e:
+            self._log_error(f"Error getting last team attendance: {e}")
+            return None
+
+    def _format_weighted_team_result(self, teams, last_attendance):
+        """格式化權重分隊結果，包含與上次分隊的比較"""
+        message = "🎲 權重分隊結果\n\n"
+
+        # 顯示本次分隊結果
+        message += "📋 本次分隊：\n"
+        for i, team in enumerate(teams, 1):
+            names = [p['name'] for p in team]
+            message += f"  隊伍 {i}: {', '.join(names)}\n"
+
+        # 顯示上次分隊結果
+        if last_attendance:
+            last_date = last_attendance.get('date', '未知日期')
+            message += f"\n📜 上次分隊 ({last_date})：\n"
+            for i, team in enumerate(last_attendance.get('teams', []), 1):
+                members = team.get('members', [])
+                names = [m.get('name', m.get('userId', '?')) for m in members]
+                message += f"  隊伍 {i}: {', '.join(names)}\n"
+        else:
+            message += "\n📜 上次分隊：無記錄\n"
+
+        return message
+
     def _format_user_attendance_data(self, attendances, user_id):
         """格式化用戶出席資料為顯示格式"""
         try:
