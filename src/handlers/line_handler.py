@@ -1672,6 +1672,8 @@ class LineMessageHandler:
 
                 # 計算總人數
                 total_count = sum(len(group) for group in groups) + len(individual_members)
+                self._log_info(f"[WEIGHTED_CMD] Parsed {len(groups)} groups, {len(individual_members)} individuals, total={total_count}")
+                self._log_info(f"[WEIGHTED_CMD] Total {total_count} players, using bracket_group mode")
 
                 if total_count < 1:
                     self._send_message(event.reply_token, "❌ 請至少輸入 1 位成員")
@@ -1708,6 +1710,7 @@ class LineMessageHandler:
 
                 # 儲存分隊結果到資料庫
                 self._store_team_result(selected_teams, context="weighted_group")
+                self._log_info(f"[WEIGHTED_CMD] Final result: {len(selected_teams)} teams, stored to DB")
 
                 # 格式化並發送結果訊息（包含上次分隊比較）
                 result_message = self._format_weighted_team_result(selected_teams, last_attendance)
@@ -1717,6 +1720,8 @@ class LineMessageHandler:
             # 無方括號的權重分隊邏輯
             # 解析成員名稱
             member_names = self._parse_member_names(target_text)
+            self._log_info(f"[WEIGHTED_CMD] Parsed 0 groups, {len(member_names)} individuals, total={len(member_names)}")
+            self._log_info(f"[WEIGHTED_CMD] Total {len(member_names)} players, using normal mode")
             if len(member_names) < 1:
                 self._send_message(event.reply_token, "❌ 請至少輸入 1 位成員名稱")
                 return
@@ -1754,6 +1759,7 @@ class LineMessageHandler:
 
             # 儲存分隊結果到資料庫
             self._store_team_result(selected_teams, context="weighted")
+            self._log_info(f"[WEIGHTED_CMD] Final result: {len(selected_teams)} teams, stored to DB")
 
             # 格式化並發送結果訊息（包含上次分隊比較）
             result_message = self._format_weighted_team_result(selected_teams, last_attendance)
@@ -2507,6 +2513,7 @@ class LineMessageHandler:
             all_player_objects.extend(individual_player_objects)
 
         total_players = len(all_player_objects)
+        self._log_info(f"[WEIGHTED_TEAMS] Input: {len(player_groups)} groups, {len(individual_players)} individuals")
 
         # 人數小於等於4時不分隊
         if total_players <= 4:
@@ -2515,6 +2522,7 @@ class LineMessageHandler:
 
         # 計算最佳隊伍分配
         optimal_teams = self._calculate_optimal_team_distribution(total_players)
+        self._log_info(f"[WEIGHTED_TEAMS] Optimal distribution: {optimal_teams} (total={total_players})")
 
         # 獲取歷史分隊記錄
         history = self._get_recent_team_history(avoid_recent_count)
@@ -2589,8 +2597,14 @@ class LineMessageHandler:
                 candidates.append((teams, similarity_score))
                 self._log_info(f"[WEIGHTED_TEAMS] Generated candidate {len(candidates)}: {[len(team) for team in teams]} teams, similarity_score={similarity_score}")
 
+        self._log_info(f"[WEIGHTED_TEAMS] Generation complete: {attempts} attempts, {len(candidates)} valid candidates")
+
         # 按相似度分數排序，選擇分數最低的（與歷史最不相似）
         candidates.sort(key=lambda x: x[1])
+
+        if candidates:
+            worst_idx = min(num_options - 1, len(candidates) - 1)
+            self._log_info(f"[WEIGHTED_TEAMS] Best option score={candidates[0][1]}, worst considered={candidates[worst_idx][1]}")
 
         # 選擇最佳選項
         options = []
@@ -2644,11 +2658,14 @@ class LineMessageHandler:
                             格式為 frozenset of frozensets (每隊的 user_id 組合)
         """
         try:
+            self._log_info(f"[HISTORY] Querying last {limit} attendance records")
             recent_attendances = self.attendances_repo.get_recent_attendances(limit)
             history = []
 
-            for attendance in recent_attendances:
+            for i, attendance in enumerate(recent_attendances):
                 teams = attendance.get('teams', [])
+                teams_count = len(teams)
+                self._log_info(f"[HISTORY] Record {i+1}: date={attendance.get('date')}, {teams_count} teams")
                 if not teams:
                     continue
 
@@ -2716,6 +2733,7 @@ class LineMessageHandler:
                 score += same_teams
                 self._log_info(f"[SIMILARITY] Found {same_teams} same team(s) with a history record")
 
+        self._log_info(f"[SIMILARITY] Final score={score} (compared with {len(history)} records)")
         return score
 
     def _calculate_optimal_team_distribution(self, total_players):
