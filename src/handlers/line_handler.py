@@ -1706,14 +1706,14 @@ class LineMessageHandler:
                 team_options = self._generate_weighted_team_options_with_groups(groups, individual_members, num_options=1, avoid_recent_count=5)
 
                 # 直接使用第一個（最佳）選項
-                selected_teams = team_options[0]
+                selected_teams, similarity_score = team_options[0]
 
                 # 儲存分隊結果到資料庫
                 self._store_team_result(selected_teams, context="weighted_group")
                 self._log_info(f"[WEIGHTED_CMD] Final result: {len(selected_teams)} teams, stored to DB")
 
                 # 格式化並發送結果訊息（包含上次分隊比較）
-                result_message = self._format_weighted_team_result(selected_teams, last_attendance)
+                result_message = self._format_weighted_team_result(selected_teams, last_attendance, similarity_score)
                 self._send_message(event.reply_token, result_message)
                 return
 
@@ -1755,14 +1755,14 @@ class LineMessageHandler:
             team_options = self._generate_weighted_team_options_with_groups([], member_names, num_options=1, avoid_recent_count=5)
 
             # 直接使用第一個（最佳）選項
-            selected_teams = team_options[0]
+            selected_teams, similarity_score = team_options[0]
 
             # 儲存分隊結果到資料庫
             self._store_team_result(selected_teams, context="weighted")
             self._log_info(f"[WEIGHTED_CMD] Final result: {len(selected_teams)} teams, stored to DB")
 
             # 格式化並發送結果訊息（包含上次分隊比較）
-            result_message = self._format_weighted_team_result(selected_teams, last_attendance)
+            result_message = self._format_weighted_team_result(selected_teams, last_attendance, similarity_score)
             self._send_message(event.reply_token, result_message)
 
         except Exception as e:
@@ -2609,7 +2609,7 @@ class LineMessageHandler:
         # 選擇最佳選項
         options = []
         for teams, score in candidates[:num_options]:
-            options.append(teams)
+            options.append((teams, score))  # 包含 score
             self._log_info(f"[WEIGHTED_TEAMS] Selected option with similarity_score={score}")
 
         # 如果選項不足，填補剩餘
@@ -2619,7 +2619,8 @@ class LineMessageHandler:
         # 如果完全無法生成選項，回退到簡單分隊
         if len(options) == 0:
             self._log_warning("[WEIGHTED_TEAMS] Could not generate valid team options, falling back to simple teams")
-            return self._generate_multiple_team_options(all_player_objects, num_options)
+            simple_teams = self._generate_multiple_team_options(all_player_objects, num_options)
+            return [(teams, 0) for teams in simple_teams]  # fallback 時 score 設為 0
 
         self._log_info(f"[WEIGHTED_TEAMS] Generated {len(options)} team options for {total_players} players with groups (history-aware)")
         return options
@@ -2647,6 +2648,23 @@ class LineMessageHandler:
         
         return teams1_sets == teams2_sets
 
+    def _extract_pairs_from_team_sets(self, team_sets):
+        """從 team_sets (frozenset of frozensets) 提取所有配對
+
+        Args:
+            team_sets: frozenset of frozensets，每個內層 frozenset 代表一隊的成員 ID
+
+        Returns:
+            frozenset: 所有配對的集合，每個配對是 frozenset([id1, id2])
+        """
+        pairs = set()
+        for team in team_sets:
+            members = list(team)
+            for i in range(len(members)):
+                for j in range(i + 1, len(members)):
+                    pairs.add(frozenset([members[i], members[j]]))
+        return frozenset(pairs)
+
     def _get_recent_team_history(self, limit=5):
         """獲取最近 N 次的分隊記錄，轉換為可比較的格式
 
@@ -2654,8 +2672,9 @@ class LineMessageHandler:
             limit: 要獲取的歷史記錄數量
 
         Returns:
-            List[frozenset]: 每個元素是一次分隊記錄，
-                            格式為 frozenset of frozensets (每隊的 user_id 組合)
+            List[tuple]: 每個元素是 (team_sets, pair_sets) 的 tuple
+                        - team_sets: frozenset of frozensets (每隊的 user_id 組合)
+                        - pair_sets: frozenset of frozensets (所有兩兩配對)
         """
         try:
             self._log_info(f"[HISTORY] Querying last {limit} attendance records")
@@ -2682,7 +2701,9 @@ class LineMessageHandler:
                         team_sets.append(member_ids)
 
                 if team_sets:
-                    history.append(frozenset(team_sets))
+                    team_sets_frozen = frozenset(team_sets)
+                    pair_sets = self._extract_pairs_from_team_sets(team_sets_frozen)
+                    history.append((team_sets_frozen, pair_sets))
 
             self._log_info(f"[HISTORY] Retrieved {len(history)} recent team records")
             return history
@@ -2696,12 +2717,13 @@ class LineMessageHandler:
 
         Args:
             teams: 當前分隊方案 (list of lists of player dicts)
-            history: 歷史記錄 (list of frozensets)
+            history: 歷史記錄 (list of tuples: (team_sets, pair_sets))
 
         Returns:
             int: 相似度分數 (0=完全不同, 越高越相似)
-                 - 完全相同的記錄數 * 100
-                 - 加上相同隊伍組合數
+                 - 完全相同的分隊: +100
+                 - 完全相同的隊伍: +10 per team
+                 - 相同的配對: +1 per pair
         """
         if not history:
             return 0
@@ -2717,21 +2739,28 @@ class LineMessageHandler:
                 current_team_sets.append(member_ids)
 
         current_arrangement = frozenset(current_team_sets)
+        current_pairs = self._extract_pairs_from_team_sets(current_arrangement)
 
         score = 0
 
-        for past_arrangement in history:
+        for past_team_sets, past_pairs in history:
             # 檢查是否完全相同
-            if current_arrangement == past_arrangement:
+            if current_arrangement == past_team_sets:
                 score += 100  # 完全相同給很高的懲罰分數
-                self._log_info(f"[SIMILARITY] Found exact match with history")
+                self._log_info(f"[SIMILARITY] Found exact match with history (+100)")
                 continue
 
-            # 計算相同的隊伍組合數量
-            same_teams = len(current_arrangement & past_arrangement)
+            # 計算相同的隊伍組合數量 (+10 per team)
+            same_teams = len(current_arrangement & past_team_sets)
             if same_teams > 0:
-                score += same_teams
-                self._log_info(f"[SIMILARITY] Found {same_teams} same team(s) with a history record")
+                score += same_teams * 10
+                self._log_info(f"[SIMILARITY] Found {same_teams} same team(s) with a history record (+{same_teams * 10})")
+
+            # 計算相同的配對數量 (+1 per pair)
+            same_pairs = len(current_pairs & past_pairs)
+            if same_pairs > 0:
+                score += same_pairs
+                self._log_info(f"[SIMILARITY] Found {same_pairs} same pair(s) with a history record (+{same_pairs})")
 
         self._log_info(f"[SIMILARITY] Final score={score} (compared with {len(history)} records)")
         return score
@@ -3089,9 +3118,12 @@ class LineMessageHandler:
             self._log_error(f"Error getting last team attendance: {e}")
             return None
 
-    def _format_weighted_team_result(self, teams, last_attendance):
+    def _format_weighted_team_result(self, teams, last_attendance, similarity_score=None):
         """格式化權重分隊結果，包含與上次分隊的比較"""
-        message = "🎲 權重分隊結果\n\n"
+        message = "🎲 權重分隊結果"
+        if similarity_score is not None:
+            message += f" (相似度: {similarity_score})"
+        message += "\n\n"
 
         # 顯示本次分隊結果
         message += "📋 本次分隊：\n"
