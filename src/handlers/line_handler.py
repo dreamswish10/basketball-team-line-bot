@@ -1633,9 +1633,20 @@ class LineMessageHandler:
                         "❌ 請提供成員名單\n\n"
                         "使用方式：\n"
                         "🔸 /權重分隊 🥛、凱、豪、金\n"
+                        "🔸 /權重分隊 3 🥛、凱、豪、金  (只參考最近3次記錄)\n"
                         "🔸 回覆包含成員名單的訊息，然後輸入 /權重分隊\n\n"
-                        "💡 權重分隊會避免與最近5次分隊結果相同")
+                        "💡 權重分隊會避免與最近N次分隊結果相同（預設5次）")
                     return
+
+            # 解析可選的歷史次數參數
+            avoid_recent_count = 5  # 預設值
+            parts = target_text.split(maxsplit=1)
+            if parts and parts[0].isdigit():
+                count = int(parts[0])
+                if 1 <= count <= 99:
+                    avoid_recent_count = count
+                    target_text = parts[1] if len(parts) > 1 else ''
+                    self._log_info(f"[WEIGHTED_CMD] Custom avoid_recent_count={avoid_recent_count}")
 
             # 檢查內容是否包含成員名稱分隔符
             if not self._is_valid_team_content(target_text):
@@ -1703,7 +1714,7 @@ class LineMessageHandler:
                 last_attendance = self._get_last_team_attendance()
 
                 # 使用權重分隊邏輯生成選項（避免與歷史重複）- 只生成1個最佳方案
-                team_options = self._generate_weighted_team_options_with_groups(groups, individual_members, num_options=1, avoid_recent_count=5)
+                team_options = self._generate_weighted_team_options_with_groups(groups, individual_members, num_options=1, avoid_recent_count=avoid_recent_count)
 
                 # 直接使用第一個（最佳）選項
                 selected_teams, similarity_score = team_options[0]
@@ -1713,7 +1724,7 @@ class LineMessageHandler:
                 self._log_info(f"[WEIGHTED_CMD] Final result: {len(selected_teams)} teams, stored to DB")
 
                 # 格式化並發送結果訊息（包含上次分隊比較）
-                result_message = self._format_weighted_team_result(selected_teams, last_attendance, similarity_score)
+                result_message = self._format_weighted_team_result(selected_teams, last_attendance, similarity_score, avoid_recent_count)
                 self._send_message(event.reply_token, result_message)
                 return
 
@@ -1752,7 +1763,7 @@ class LineMessageHandler:
             last_attendance = self._get_last_team_attendance()
 
             # 使用權重分隊邏輯生成選項（將所有成員視為個別成員，無群組）- 只生成1個最佳方案
-            team_options = self._generate_weighted_team_options_with_groups([], member_names, num_options=1, avoid_recent_count=5)
+            team_options = self._generate_weighted_team_options_with_groups([], member_names, num_options=1, avoid_recent_count=avoid_recent_count)
 
             # 直接使用第一個（最佳）選項
             selected_teams, similarity_score = team_options[0]
@@ -1762,7 +1773,7 @@ class LineMessageHandler:
             self._log_info(f"[WEIGHTED_CMD] Final result: {len(selected_teams)} teams, stored to DB")
 
             # 格式化並發送結果訊息（包含上次分隊比較）
-            result_message = self._format_weighted_team_result(selected_teams, last_attendance, similarity_score)
+            result_message = self._format_weighted_team_result(selected_teams, last_attendance, similarity_score, avoid_recent_count)
             self._send_message(event.reply_token, result_message)
 
         except Exception as e:
@@ -3118,11 +3129,11 @@ class LineMessageHandler:
             self._log_error(f"Error getting last team attendance: {e}")
             return None
 
-    def _format_weighted_team_result(self, teams, last_attendance, similarity_score=None):
+    def _format_weighted_team_result(self, teams, last_attendance, similarity_score=None, avoid_recent_count=5):
         """格式化權重分隊結果，包含與上次分隊的比較"""
         message = "🎲 權重分隊結果"
         if similarity_score is not None:
-            message += f" (相似度: {similarity_score})"
+            message += f" (相似度: {similarity_score}, 參考{avoid_recent_count}次)"
         message += "\n\n"
 
         # 顯示本次分隊結果
