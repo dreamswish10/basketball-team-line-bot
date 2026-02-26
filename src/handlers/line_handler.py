@@ -1635,11 +1635,11 @@ class LineMessageHandler:
                         "🔸 /權重分隊 🥛、凱、豪、金\n"
                         "🔸 /權重分隊 3 🥛、凱、豪、金  (只參考最近3次記錄)\n"
                         "🔸 回覆包含成員名單的訊息，然後輸入 /權重分隊\n\n"
-                        "💡 權重分隊會避免與最近N次分隊結果相同（預設5次）")
+                        "💡 權重分隊會避免與最近N次分隊結果相同（預設1次）")
                     return
 
             # 解析可選的歷史次數參數
-            avoid_recent_count = 5  # 預設值
+            avoid_recent_count = 1  # 預設值
             parts = target_text.split(maxsplit=1)
             if parts and parts[0].isdigit():
                 count = int(parts[0])
@@ -2498,7 +2498,7 @@ class LineMessageHandler:
         self._log_info(f"[GROUP_TEAMS] Generated {len(options)} team options for {total_players} players with groups")
         return options
 
-    def _generate_weighted_team_options_with_groups(self, player_groups, individual_players, num_options=3, avoid_recent_count=5):
+    def _generate_weighted_team_options_with_groups(self, player_groups, individual_players, num_options=3, avoid_recent_count=1):
         """生成多組分隊選項，支援方括號群組，並避免與最近歷史重複
 
         Args:
@@ -3129,7 +3129,7 @@ class LineMessageHandler:
             self._log_error(f"Error getting last team attendance: {e}")
             return None
 
-    def _format_weighted_team_result(self, teams, last_attendance, similarity_score=None, avoid_recent_count=5):
+    def _format_weighted_team_result(self, teams, last_attendance, similarity_score=None, avoid_recent_count=1):
         """格式化權重分隊結果，包含與上次分隊的比較"""
         message = "🎲 權重分隊結果"
         if similarity_score is not None:
