@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>分隊紀錄</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --primary: #06c755;
+      --border: #e5e7eb;
+      --highlight: #ecfdf5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans TC", sans-serif;
+      background: var(--bg); color: var(--text); font-size: 15px;
+    }
+    h1 { font-size: 1.25rem; margin: 0 0 12px; }
+    h2 { font-size: 1rem; margin: 0 0 8px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px; margin-bottom: 14px;
+    }
+    .summary-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+    }
+    .summary-cell {
+      background: var(--highlight); border-radius: 8px; padding: 10px;
+    }
+    .summary-cell .label { font-size: 0.75rem; color: var(--muted); }
+    .summary-cell .value { font-size: 1.1rem; font-weight: 600; }
+    table {
+      width: 100%; border-collapse: collapse; font-size: 0.9rem;
+    }
+    th, td {
+      padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left;
+    }
+    th { color: var(--muted); font-weight: 500; }
+    .division { border-left: 3px solid var(--primary); padding-left: 10px; margin-bottom: 12px; }
+    .division-date { font-weight: 600; margin-bottom: 4px; }
+    .team-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+    .team-label { color: var(--muted); min-width: 56px; font-size: 0.85rem; }
+    .pill {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      background: #f3f4f6; font-size: 0.8rem;
+    }
+    .pill.in-group { background: #dcfce7; color: #047857; }
+    #loading, #error {
+      text-align: center; padding: 24px; color: var(--muted);
+    }
+    #error { color: #b91c1c; }
+    .tab-bar {
+      display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;
+    }
+    .tab {
+      padding: 6px 12px; border-radius: 999px; background: #fff;
+      border: 1px solid var(--border); font-size: 0.85rem; cursor: pointer;
+    }
+    .tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .section { display: none; }
+    .section.active { display: block; }
+  </style>
+</head>
+<body>
+  <div id="loading">載入中…</div>
+  <div id="error" hidden></div>
+
+  <main id="app" hidden>
+    <h1 id="group-name">分隊紀錄</h1>
+
+    <div class="tab-bar">
+      <button class="tab active" data-target="summary">摘要</button>
+      <button class="tab" data-target="divisions">歷史分隊</button>
+      <button class="tab" data-target="players">球員統計</button>
+      <button class="tab" data-target="pairs">隊友共現</button>
+    </div>
+
+    <section id="summary" class="section active">
+      <div class="card">
+        <h2>群組摘要</h2>
+        <div id="summary-body" class="summary-grid"></div>
+      </div>
+    </section>
+
+    <section id="divisions" class="section">
+      <div class="card">
+        <h2>最近分隊</h2>
+        <div id="divisions-body"></div>
+      </div>
+    </section>
+
+    <section id="players" class="section">
+      <div class="card">
+        <h2>球員出場</h2>
+        <div id="players-body"></div>
+      </div>
+    </section>
+
+    <section id="pairs" class="section">
+      <div class="card">
+        <h2>最常同隊（前 10）</h2>
+        <div id="pairs-most-body"></div>
+      </div>
+      <div class="card">
+        <h2>最少同隊（前 10）</h2>
+        <div id="pairs-least-body"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const LIFF_ID = "{{ liff_id }}";
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = '錯誤：' + msg;
+      el.hidden = false;
+      document.getElementById('loading').hidden = true;
+    }
+
+    function setupTabs() {
+      document.querySelectorAll('.tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById(btn.dataset.target).classList.add('active');
+        });
+      });
+    }
+
+    function renderSummary(s) {
+      const cells = [
+        { label: '活躍成員', value: s.active_members },
+        { label: '總場次', value: s.total_sessions },
+        { label: '平均隊伍人數', value: s.avg_team_size },
+        { label: '最近一場', value: s.latest_session_date || '—' },
+      ];
+      document.getElementById('summary-body').innerHTML =
+        cells.map(c => `<div class="summary-cell"><div class="label">${c.label}</div><div class="value">${c.value}</div></div>`).join('');
+      if (s.group_name) document.getElementById('group-name').textContent = s.group_name;
+    }
+
+    function renderDivisions(divisions) {
+      if (!divisions.length) {
+        document.getElementById('divisions-body').textContent = '尚無分隊紀錄';
+        return;
+      }
+      document.getElementById('divisions-body').innerHTML = divisions.map(d => {
+        const teams = d.teams.map(t => {
+          const pills = t.members.map(m =>
+            `<span class="pill ${m.in_group ? 'in-group' : ''}">${escapeHtml(m.name)}</span>`
+          ).join('');
+          return `<div class="team-row"><span class="team-label">${escapeHtml(t.teamId)}</span>${pills}</div>`;
+        }).join('');
+        return `<div class="division"><div class="division-date">${escapeHtml(d.date)}</div>${teams}</div>`;
+      }).join('');
+    }
+
+    function renderPlayers(players) {
+      if (!players.length) {
+        document.getElementById('players-body').textContent = '尚無成員';
+        return;
+      }
+      const rows = players.map(p =>
+        `<tr><td>${escapeHtml(p.name)}</td><td>${p.appearances}</td><td>${escapeHtml(p.last_seen || '—')}</td></tr>`
+      ).join('');
+      document.getElementById('players-body').innerHTML =
+        `<table><thead><tr><th>名字</th><th>出場</th><th>最近</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    function renderPairs(pairs) {
+      const fmt = list => list.length
+        ? `<table><tbody>${list.map(p =>
+            `<tr><td>${escapeHtml(p.nameA)} × ${escapeHtml(p.nameB)}</td><td>${p.count}</td></tr>`
+          ).join('')}</tbody></table>`
+        : '尚無資料';
+      document.getElementById('pairs-most-body').innerHTML = fmt(pairs.most_common || []);
+      document.getElementById('pairs-least-body').innerHTML = fmt(pairs.least_common || []);
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+      ));
+    }
+
+    async function main() {
+      setupTabs();
+
+      if (!LIFF_ID) {
+        showError('伺服器未設定 LIFF_ID');
+        return;
+      }
+
+      try {
+        await liff.init({ liffId: LIFF_ID });
+      } catch (e) {
+        showError('LIFF 初始化失敗：' + e.message);
+        return;
+      }
+
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+
+      const idToken = liff.getIDToken();
+      const groupId = new URLSearchParams(location.search).get('group_id');
+      if (!groupId) {
+        showError('連結缺少 group_id 參數，請重新從 LINE 群組開啟');
+        return;
+      }
+
+      let res;
+      try {
+        res = await fetch('/api/group_data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id_token: idToken, group_id: groupId }),
+        });
+      } catch (e) {
+        showError('連線失敗：' + e.message);
+        return;
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const msgMap = {
+          401: '身分驗證失敗，請重新開啟連結',
+          403: '你不是這個群組的成員，無法檢視',
+          400: '請求參數錯誤',
+        };
+        showError(msgMap[res.status] || (body.error || ('HTTP ' + res.status)));
+        return;
+      }
+
+      const data = await res.json();
+      renderSummary(data.summary || {});
+      renderDivisions(data.divisions || []);
+      renderPlayers(data.players || []);
+      renderPairs(data.pairs || {});
+
+      document.getElementById('loading').hidden = true;
+      document.getElementById('app').hidden = false;
+    }
+
+    main().catch(e => showError(e.message));
+  </script>
+</body>
+</html>

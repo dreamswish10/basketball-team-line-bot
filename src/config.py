@@ -14,9 +14,19 @@ except ImportError:
 class Config:
     """應用程式配置類"""
     
-    # LINE Bot 設定
+    # LINE Bot (Messaging API channel) 設定
     LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
     LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
+
+    # LIFF 設定
+    # 2024 起 LIFF 必須建在「LINE Login channel」（同 provider 下另開一個 channel），
+    # 不能再加在 Messaging API channel。
+    # LIFF_ID：在 LINE Login channel 的 LIFF 分頁建立後取得
+    # LIFF_CHANNEL_ID：該 LINE Login channel 的 Channel ID（非 secret），
+    # 用來向 LINE 驗證 id_token 的 audience
+    LIFF_ID = os.getenv('LIFF_ID', '')
+    LIFF_CHANNEL_ID = os.getenv('LIFF_CHANNEL_ID', '')
+    PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL', '')
     
     # Flask 設定
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')

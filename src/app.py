@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from flask import Flask, request, abort
+from flask import Flask, request, abort, render_template, jsonify
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import (
@@ -9,6 +9,7 @@ from linebot.models import (
     JoinEvent, MemberJoinedEvent, MemberLeftEvent, LeaveEvent
 )
 import os
+import requests
 from src.config import Config
 from src.database.mongodb import init_mongodb, get_database
 from src.models.player import Player
@@ -18,8 +19,9 @@ from src.models.mongodb_models import (
 )
 from src.handlers.line_handler import LineMessageHandler
 from src.handlers.group_manager import GroupManager
+from src.services import stats_service
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates', static_folder='static')
 app.config.from_object(Config)
 
 # LINE Bot 設定
@@ -434,6 +436,61 @@ def test_bubble():
 @app.route("/health")
 def health_check():
     return {"status": "healthy", "service": "basketball-team-generator"}
+
+
+def verify_liff_id_token(id_token, channel_id):
+    """向 LINE 驗證 LIFF id_token，成功回傳 user_id (sub)，失敗回 None。"""
+    if not id_token or not channel_id:
+        return None
+    try:
+        r = requests.post(
+            'https://api.line.me/oauth2/v2.1/verify',
+            data={'id_token': id_token, 'client_id': channel_id},
+            timeout=5,
+        )
+    except requests.RequestException as e:
+        app.logger.warning(f"[LIFF_VERIFY] Network error: {e}")
+        return None
+    if r.status_code != 200:
+        app.logger.info(f"[LIFF_VERIFY] Rejected by LINE: {r.status_code} {r.text[:200]}")
+        return None
+    return r.json().get('sub')
+
+
+@app.route("/view")
+def view_page():
+    """LIFF 內嵌網頁入口。前端 JS 會以 LIFF SDK 取 id_token 後呼叫 /api/group_data。"""
+    return render_template('view.html', liff_id=app.config.get('LIFF_ID', ''))
+
+
+@app.route("/api/group_data", methods=['POST'])
+def api_group_data():
+    payload = request.get_json(silent=True) or {}
+    id_token = payload.get('id_token')
+    group_id = payload.get('group_id')
+
+    if not id_token or not group_id:
+        return jsonify({'error': 'missing id_token or group_id'}), 400
+
+    user_id = verify_liff_id_token(id_token, app.config.get('LIFF_CHANNEL_ID'))
+    if not user_id:
+        return jsonify({'error': 'invalid id_token'}), 401
+
+    member = db.group_members.find_one({
+        'group_id': group_id,
+        'user_id': user_id,
+        'is_active': True,
+    })
+    if not member:
+        app.logger.info(f"[VIEW] User {user_id} not in group {group_id}")
+        return jsonify({'error': 'not a member of this group'}), 403
+
+    return jsonify({
+        'summary': stats_service.get_group_summary(db, group_id),
+        'divisions': stats_service.get_recent_divisions(db, group_id),
+        'players': stats_service.get_player_stats(db, group_id),
+        'pairs': stats_service.get_pair_cooccurrence(db, group_id),
+    })
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5000))
