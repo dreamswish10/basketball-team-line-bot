@@ -108,12 +108,12 @@
         <div id="pairs-most-body"></div>
       </div>
       <div class="card">
-        <h2>最少同隊（前 5）</h2>
-        <div id="pairs-least-body"></div>
+        <h2>最常同隊三人組（前 5）</h2>
+        <div id="trios-most-body"></div>
       </div>
       <div class="card">
-        <h2>最常同隊三人組（前 5）</h2>
-        <div id="trios-body"></div>
+        <h2>還沒同隊過的三人組（前 10）</h2>
+        <div id="trios-never-body"></div>
       </div>
     </section>
   </main>
@@ -180,21 +180,30 @@
     }
 
     function renderPairs(pairs) {
-      const fmt = list => list.length
+      const list = pairs.most_common || [];
+      document.getElementById('pairs-most-body').innerHTML = list.length
         ? `<table><tbody>${list.map(p =>
             `<tr><td>${escapeHtml(p.nameA)} × ${escapeHtml(p.nameB)}</td><td>${p.count}</td></tr>`
           ).join('')}</tbody></table>`
         : '尚無資料';
-      document.getElementById('pairs-most-body').innerHTML = fmt(pairs.most_common || []);
-      document.getElementById('pairs-least-body').innerHTML = fmt(pairs.least_common || []);
     }
 
     function renderTrios(trios) {
-      const el = document.getElementById('trios-body');
-      if (!trios.length) { el.textContent = '尚無資料'; return; }
-      el.innerHTML = `<table><tbody>${trios.map(t =>
-        `<tr><td>${t.names.map(escapeHtml).join(' × ')}</td><td>${t.count}</td></tr>`
-      ).join('')}</tbody></table>`;
+      const mostEl = document.getElementById('trios-most-body');
+      const most = trios.most_common || [];
+      mostEl.innerHTML = most.length
+        ? `<table><tbody>${most.map(t =>
+            `<tr><td>${t.names.map(escapeHtml).join(' × ')}</td><td>${t.count}</td></tr>`
+          ).join('')}</tbody></table>`
+        : '尚無資料';
+
+      const neverEl = document.getElementById('trios-never-body');
+      const never = trios.never_together || [];
+      neverEl.innerHTML = never.length
+        ? `<table><thead><tr><th>三人組</th><th>合計出場</th></tr></thead><tbody>${never.map(t =>
+            `<tr><td>${t.names.map(escapeHtml).join(' × ')}</td><td>${t.combined_appearances}</td></tr>`
+          ).join('')}</tbody></table>`
+        : '所有三人組都同隊過了 🎉';
     }
 
     function escapeHtml(s) {

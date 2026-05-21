@@ -84,8 +84,41 @@ def get_player_stats(db: Database, group_id: str) -> List[Dict]:
 
 
 def get_pair_cooccurrence(db: Database, group_id: str, top_n: int = 5) -> Dict[str, List[Dict]]:
-    """兩兩同隊次數。回傳 most_common 與 least_common（least 只含至少出場過一次的雙方）。"""
+    """兩兩同隊次數，最常 top_n 組。"""
     pair_counter: Counter = Counter()
+    name_lookup: Dict[str, str] = {}
+
+    for att in db.attendances.find():
+        for team in att.get("teams", []):
+            keys_in_team = []
+            for m in team.get("members", []):
+                key = _member_key(m)
+                if not key:
+                    continue
+                keys_in_team.append(key)
+                if m.get("name"):
+                    name_lookup.setdefault(key, m["name"])
+            for a, b in combinations(sorted(set(keys_in_team)), 2):
+                pair_counter[(a, b)] += 1
+
+    most_common = [
+        {
+            "userA": a, "nameA": name_lookup.get(a, "Unknown"),
+            "userB": b, "nameB": name_lookup.get(b, "Unknown"),
+            "count": count,
+        }
+        for (a, b), count in pair_counter.most_common(top_n)
+    ]
+    return {"most_common": most_common}
+
+
+def get_trio_cooccurrence(
+    db: Database, group_id: str, top_n: int = 5, never_top_n: int = 10
+) -> Dict[str, List[Dict]]:
+    """三人同隊統計：最常 top_n 組 + 還沒同隊過 never_top_n 組。
+    『還沒同隊』按三人出場總場次 desc 排（越活躍越優先）。"""
+    trio_counter: Counter = Counter()
+    appearance_count: Counter = Counter()
     name_lookup: Dict[str, str] = {}
     appeared: Set[str] = set()
 
@@ -98,57 +131,38 @@ def get_pair_cooccurrence(db: Database, group_id: str, top_n: int = 5) -> Dict[s
                     continue
                 keys_in_team.append(key)
                 appeared.add(key)
-                if m.get("name"):
-                    name_lookup.setdefault(key, m["name"])
-            for a, b in combinations(sorted(set(keys_in_team)), 2):
-                pair_counter[(a, b)] += 1
-
-    full_pairs: Dict[tuple, int] = {}
-    for a, b in combinations(sorted(appeared), 2):
-        full_pairs[(a, b)] = pair_counter.get((a, b), 0)
-
-    def _format(pair, count):
-        a, b = pair
-        return {
-            "userA": a, "nameA": name_lookup.get(a, "Unknown"),
-            "userB": b, "nameB": name_lookup.get(b, "Unknown"),
-            "count": count,
-        }
-
-    sorted_pairs = sorted(full_pairs.items(), key=lambda kv: kv[1])
-    most_common = [_format(p, c) for p, c in sorted_pairs[::-1][:top_n]]
-    least_common = [_format(p, c) for p, c in sorted_pairs[:top_n]]
-    return {"most_common": most_common, "least_common": least_common}
-
-
-def get_trio_cooccurrence(db: Database, group_id: str, top_n: int = 5) -> List[Dict]:
-    """三人同隊次數，回傳最常出現的 top_n 組（次數 > 0）。"""
-    trio_counter: Counter = Counter()
-    name_lookup: Dict[str, str] = {}
-
-    for att in db.attendances.find():
-        for team in att.get("teams", []):
-            keys_in_team = []
-            for m in team.get("members", []):
-                key = _member_key(m)
-                if not key:
-                    continue
-                keys_in_team.append(key)
+                appearance_count[key] += 1
                 if m.get("name"):
                     name_lookup.setdefault(key, m["name"])
             for a, b, c in combinations(sorted(set(keys_in_team)), 3):
                 trio_counter[(a, b, c)] += 1
 
-    top = trio_counter.most_common(top_n)
-    return [
-        {
-            "names": [name_lookup.get(a, "Unknown"),
-                      name_lookup.get(b, "Unknown"),
-                      name_lookup.get(c, "Unknown")],
-            "count": count,
-        }
-        for (a, b, c), count in top
+    def _names(a, b, c):
+        return [name_lookup.get(a, "Unknown"),
+                name_lookup.get(b, "Unknown"),
+                name_lookup.get(c, "Unknown")]
+
+    most_common = [
+        {"names": _names(a, b, c), "count": count}
+        for (a, b, c), count in trio_counter.most_common(top_n)
     ]
+
+    never_candidates = []
+    for a, b, c in combinations(sorted(appeared), 3):
+        if (a, b, c) in trio_counter:
+            continue
+        combined = appearance_count[a] + appearance_count[b] + appearance_count[c]
+        never_candidates.append((combined, a, b, c))
+    never_candidates.sort(key=lambda x: (-x[0], x[1], x[2], x[3]))
+    never_together = [
+        {
+            "names": _names(a, b, c),
+            "combined_appearances": combined,
+        }
+        for combined, a, b, c in never_candidates[:never_top_n]
+    ]
+
+    return {"most_common": most_common, "never_together": never_together}
 
 
 def get_group_summary(db: Database, group_id: str) -> Dict:
