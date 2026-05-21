@@ -67,6 +67,46 @@
     .section.active { display: block; }
     .hint { font-size: 0.8rem; color: var(--muted); margin: 0 0 10px; line-height: 1.4; }
     .scroll-list { max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .step { margin-bottom: 14px; }
+    .step-title { font-weight: 600; margin-bottom: 8px; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px;
+      background: #fff; color: var(--text); font-size: 0.9rem; cursor: pointer;
+    }
+    .btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .btn.selected { background: #dcfce7; border-color: var(--primary); color: #047857; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .rank-list { display: flex; flex-direction: column; gap: 6px; }
+    .rank-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+      background: #fafafa;
+    }
+    .rank-num {
+      flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+      background: var(--primary); color: #fff; font-weight: 600;
+      display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+    }
+    .rank-body { flex: 1; min-width: 0; }
+    .rank-team-id { font-weight: 600; font-size: 0.85rem; }
+    .rank-members { font-size: 0.75rem; color: var(--muted); margin-top: 2px; word-break: break-word; }
+    .rank-arrows { display: flex; flex-direction: column; gap: 2px; }
+    .rank-arrow {
+      width: 28px; height: 22px; border: 1px solid var(--border); border-radius: 4px;
+      background: #fff; font-size: 0.7rem; cursor: pointer; line-height: 1;
+    }
+    .rank-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+    .submitted-row { padding: 6px 0; font-size: 0.85rem; }
+    .submitted-row .label { color: var(--muted); }
+    .estimation-row {
+      padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 0.85rem;
+    }
+    .estimation-row:last-child { border-bottom: none; }
+    .estimation-meta { color: var(--muted); font-size: 0.75rem; margin-top: 2px; }
+    .delta { font-weight: 600; }
+    .delta.over { color: #b91c1c; }
+    .delta.under { color: #047857; }
   </style>
 </head>
 <body>
@@ -81,6 +121,7 @@
       <button class="tab" data-target="divisions">歷史分隊</button>
       <button class="tab" data-target="players">球員統計</button>
       <button class="tab" data-target="pairs">隊友共現</button>
+      <button class="tab" data-target="feedback">回饋</button>
     </div>
 
     <section id="summary" class="section active">
@@ -129,6 +170,24 @@
         <div id="trios-never-body" class="scroll-list"></div>
       </div>
     </section>
+
+    <section id="feedback" class="section">
+      <div class="card">
+        <h2 id="feedback-title">本週投票</h2>
+        <p class="hint">沒到場也能填預測，到場的人再多填一份體感。比對預期 vs 實際，找出最被高估 / 低估的隊伍。</p>
+        <div id="feedback-body"></div>
+      </div>
+      <div class="card">
+        <h2>最被高估的隊伍（前 5）</h2>
+        <p class="hint">預期排名比體感排名高的隊伍。delta = 體感名次 − 預期名次，正值越大代表越「看走眼」。</p>
+        <div id="overrated-body"></div>
+      </div>
+      <div class="card">
+        <h2>最被低估的隊伍（前 5）</h2>
+        <p class="hint">預期排名比體感排名低的隊伍。負值越大代表越「黑馬」。</p>
+        <div id="underrated-body"></div>
+      </div>
+    </section>
   </main>
 
   <script>
@@ -143,13 +202,19 @@
 
     function setupTabs() {
       document.querySelectorAll('.tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-          document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-          btn.classList.add('active');
-          document.getElementById(btn.dataset.target).classList.add('active');
-        });
+        btn.addEventListener('click', () => activateTab(btn.dataset.target));
       });
+      const wanted = new URLSearchParams(location.search).get('tab');
+      if (wanted && document.getElementById(wanted)) activateTab(wanted);
+    }
+
+    function activateTab(name) {
+      document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      const tabBtn = document.querySelector(`.tab[data-target="${name}"]`);
+      if (tabBtn) tabBtn.classList.add('active');
+      const sec = document.getElementById(name);
+      if (sec) sec.classList.add('active');
     }
 
     function renderSummary(s) {
@@ -241,6 +306,212 @@
         : '所有三人組都同隊過了 🎉';
     }
 
+    let _liffIdToken = null;
+    let _feedbackSession = null;
+    let _myOpinion = null;
+    let _voteCounts = { pre_votes: 0, post_votes: 0 };
+    let _stepperState = { played: null, pre_ranking: [], post_ranking: [], editing: false };
+
+    async function initFeedback(idToken) {
+      _liffIdToken = idToken;
+      try {
+        const res = await fetch('/api/feedback/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id_token: idToken }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          document.getElementById('feedback-body').textContent = '載入失敗：' + (data.error || res.status);
+          return;
+        }
+        _feedbackSession = data.session;
+        _myOpinion = data.my_opinion;
+        _voteCounts = data.vote_counts || _voteCounts;
+        renderFeedback();
+      } catch (e) {
+        document.getElementById('feedback-body').textContent = '載入失敗：' + e.message;
+      }
+    }
+
+    function teamIdsDefault() {
+      return _feedbackSession.teams.map(t => t.teamId);
+    }
+
+    function renderFeedback() {
+      const el = document.getElementById('feedback-body');
+      if (!_feedbackSession) {
+        el.innerHTML = '<div class="hint">本週還沒有分隊紀錄，等管理員 /record 之後再來投票。</div>';
+        return;
+      }
+      document.getElementById('feedback-title').textContent = `本週投票 — ${_feedbackSession.date}`;
+
+      if (_myOpinion && !_stepperState.editing) {
+        el.innerHTML = renderMyOpinion();
+        document.getElementById('reopen-btn').addEventListener('click', () => {
+          _stepperState = {
+            played: _myOpinion.played,
+            pre_ranking: [...(_myOpinion.pre_ranking || teamIdsDefault())],
+            post_ranking: [...(_myOpinion.post_ranking || teamIdsDefault())],
+            editing: true,
+          };
+          renderFeedback();
+        });
+        return;
+      }
+
+      if (!_stepperState.pre_ranking.length) _stepperState.pre_ranking = teamIdsDefault();
+      if (!_stepperState.post_ranking.length) _stepperState.post_ranking = teamIdsDefault();
+
+      el.innerHTML = renderStepper();
+      attachStepperListeners();
+    }
+
+    function formatRanking(ranking) {
+      if (!ranking || !ranking.length) return '—';
+      return ranking.map((tid, i) => `#${i + 1} ${escapeHtml(tid)}`).join(' → ');
+    }
+
+    function renderMyOpinion() {
+      return `
+        <div class="submitted-row">✅ 你已投票（${escapeHtml(_feedbackSession.date)}）</div>
+        <div class="submitted-row"><span class="label">參加：</span>${_myOpinion.played ? '有' : '沒'}</div>
+        <div class="submitted-row"><span class="label">預期排名：</span>${formatRanking(_myOpinion.pre_ranking)}</div>
+        ${_myOpinion.played ? `<div class="submitted-row"><span class="label">體感排名：</span>${formatRanking(_myOpinion.post_ranking)}</div>` : ''}
+        <div class="submitted-row"><span class="label">目前累積：</span>預期 ${_voteCounts.pre_votes} 票 / 體感 ${_voteCounts.post_votes} 票</div>
+        <button id="reopen-btn" class="btn" style="margin-top: 8px;">重投</button>
+      `;
+    }
+
+    function renderRankList(ranking, prefix) {
+      const lookup = {};
+      _feedbackSession.teams.forEach(t => lookup[t.teamId] = t);
+      return ranking.map((tid, i) => {
+        const team = lookup[tid] || { teamId: tid, members: [] };
+        const names = team.members.map(m => m.name).join('、');
+        return `
+          <div class="rank-item">
+            <div class="rank-num">${i + 1}</div>
+            <div class="rank-body">
+              <div class="rank-team-id">${escapeHtml(team.teamId)}</div>
+              <div class="rank-members">${escapeHtml(names) || '—'}</div>
+            </div>
+            <div class="rank-arrows">
+              <button class="rank-arrow" data-prefix="${prefix}" data-idx="${i}" data-dir="up" ${i === 0 ? 'disabled' : ''}>▲</button>
+              <button class="rank-arrow" data-prefix="${prefix}" data-idx="${i}" data-dir="down" ${i === ranking.length - 1 ? 'disabled' : ''}>▼</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderStepper() {
+      const s = _stepperState;
+      const step1 = `
+        <div class="step">
+          <div class="step-title">Step 1. 你今天有參與打球嗎？</div>
+          <div class="btn-row">
+            <button class="btn ${s.played === true ? 'selected' : ''}" data-played="true">有</button>
+            <button class="btn ${s.played === false ? 'selected' : ''}" data-played="false">沒</button>
+          </div>
+        </div>
+      `;
+      const step2 = (s.played !== null) ? `
+        <div class="step">
+          <div class="step-title">Step 2. 你預期哪些隊「會在場上待久」（強 → 弱）</div>
+          <div class="rank-list">${renderRankList(s.pre_ranking, 'pre')}</div>
+        </div>
+      ` : '';
+      const step3 = (s.played === true) ? `
+        <div class="step">
+          <div class="step-title">Step 3. 打完後你體感的排名（強 → 弱）</div>
+          <div class="rank-list">${renderRankList(s.post_ranking, 'post')}</div>
+        </div>
+      ` : '';
+      const submit = `
+        <div class="step">
+          <button class="btn primary" id="submit-btn" ${s.played === null ? 'disabled' : ''}>送出</button>
+        </div>
+      `;
+      return step1 + step2 + step3 + submit;
+    }
+
+    function attachStepperListeners() {
+      document.querySelectorAll('[data-played]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          _stepperState.played = btn.dataset.played === 'true';
+          renderFeedback();
+        });
+      });
+      document.querySelectorAll('.rank-arrow').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const arr = btn.dataset.prefix === 'pre' ? _stepperState.pre_ranking : _stepperState.post_ranking;
+          const idx = parseInt(btn.dataset.idx, 10);
+          const j = btn.dataset.dir === 'up' ? idx - 1 : idx + 1;
+          [arr[idx], arr[j]] = [arr[j], arr[idx]];
+          renderFeedback();
+        });
+      });
+      const submitBtn = document.getElementById('submit-btn');
+      if (submitBtn) submitBtn.addEventListener('click', submitFeedback);
+    }
+
+    async function submitFeedback() {
+      const s = _stepperState;
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true; btn.textContent = '送出中…';
+      try {
+        const res = await fetch('/api/feedback/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id_token: _liffIdToken,
+            date: _feedbackSession.date,
+            played: s.played,
+            pre_ranking: s.pre_ranking,
+            post_ranking: s.played ? s.post_ranking : null,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          btn.disabled = false; btn.textContent = '送出';
+          alert('送出失敗：' + (data.error || res.status));
+          return;
+        }
+        _myOpinion = {
+          played: s.played,
+          pre_ranking: s.pre_ranking,
+          post_ranking: s.played ? s.post_ranking : null,
+        };
+        _voteCounts = data.vote_counts || _voteCounts;
+        _stepperState = { played: null, pre_ranking: [], post_ranking: [], editing: false };
+        renderFeedback();
+      } catch (e) {
+        btn.disabled = false; btn.textContent = '送出';
+        alert('連線失敗：' + e.message);
+      }
+    }
+
+    function renderEstimation(data) {
+      const minVotes = data.min_votes != null ? data.min_votes : 3;
+      const fmt = (rows, cls) => rows.length
+        ? rows.map(r => `
+            <div class="estimation-row">
+              <div>
+                <strong>${escapeHtml(r.team_id)}</strong>
+                <span class="delta ${cls}">Δ ${r.delta > 0 ? '+' : ''}${r.delta}</span>
+                <span> · 預期 #${r.predicted_rank} → 體感 #${r.felt_rank}</span>
+              </div>
+              <div class="estimation-meta">
+                ${escapeHtml(r.date)} · ${escapeHtml((r.members || []).join('、'))} · ${r.pre_votes}/${r.post_votes} 票
+              </div>
+            </div>
+          `).join('')
+        : `<div class="hint">資料不足（至少需要 ${minVotes} 票 pre + ${minVotes} 票 post 的場次才會列入）</div>`;
+      document.getElementById('overrated-body').innerHTML = fmt(data.overrated || [], 'over');
+      document.getElementById('underrated-body').innerHTML = fmt(data.underrated || [], 'under');
+    }
+
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, c => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -305,6 +576,8 @@
       renderPlayers(data.players || []);
       renderPairs(data.pairs || {});
       renderTrios(data.trios || []);
+      renderEstimation(data.team_estimation || {});
+      initFeedback(idToken);
 
       document.getElementById('loading').hidden = true;
       document.getElementById('app').hidden = false;

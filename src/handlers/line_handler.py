@@ -237,6 +237,12 @@ class LineMessageHandler:
                     self._handle_view_command(event, group_id)
                 else:
                     self._send_message(event.reply_token, "❌ 此指令只能在群組中使用")
+            elif message_text.startswith('/feedback') or message_text.startswith('/回饋'):
+                self._log_info(f"[COMMAND] Matched: /feedback, User: {user_id}")
+                if is_group:
+                    self._handle_feedback_command(event, group_id)
+                else:
+                    self._send_message(event.reply_token, "❌ 此指令只能在群組中使用")
             elif message_text.startswith('/register') or message_text.startswith('註冊'):
                 self._log_info(f"[COMMAND] Matched: /register, User: {user_id}")
                 self._handle_register_command(event, message_text, group_id)
@@ -1339,6 +1345,26 @@ class LineMessageHandler:
             self._send_message(event.reply_token, message)
         except Exception as e:
             self._log_error(f"[VIEW] Error generating LIFF link: {e}")
+            self._send_message(event.reply_token, "❌ 產生連結失敗，請稍後再試")
+
+    def _handle_feedback_command(self, event, group_id):
+        """產生並發送 LIFF 回饋連結，直接帶到回饋 tab。"""
+        try:
+            from src.config import Config
+            liff_id = Config.LIFF_ID
+            if not liff_id:
+                self._send_message(event.reply_token, "❌ 尚未設定 LIFF_ID，無法產生連結")
+                return
+
+            url = f"https://liff.line.me/{liff_id}?group_id={group_id}&tab=feedback"
+            message = (
+                "📝 本週分隊「預期 vs 體感」投票\n"
+                f"{url}\n\n"
+                "沒到場的人也可以填預測，看看誰最會「看走眼」😎"
+            )
+            self._send_message(event.reply_token, message)
+        except Exception as e:
+            self._log_error(f"[FEEDBACK] Error generating LIFF link: {e}")
             self._send_message(event.reply_token, "❌ 產生連結失敗，請稍後再試")
 
     def _send_message(self, reply_token, message_text, quick_reply=None):

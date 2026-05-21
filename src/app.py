@@ -486,7 +486,78 @@ def api_group_data():
         'trios': stats_service.get_trio_cooccurrence(db, group_id),
         'recent_stars': stats_service.get_recent_stars(db, group_id),
         'dormant_members': stats_service.get_dormant_members(db, group_id),
+        'team_estimation': stats_service.get_team_estimation_ranking(db),
     })
+
+
+@app.route("/api/feedback/session", methods=['POST'])
+def api_feedback_session():
+    """回傳本週可投票場次 + 該使用者目前的投票（若有）+ 累積票數。"""
+    payload = request.get_json(silent=True) or {}
+    id_token = payload.get('id_token')
+    if not id_token:
+        return jsonify({'error': 'missing id_token'}), 400
+
+    user_id = verify_liff_id_token(id_token, app.config.get('LIFF_CHANNEL_ID'))
+    if not user_id:
+        return jsonify({'error': 'invalid id_token'}), 401
+
+    session = stats_service.get_feedback_session(db)
+    if not session:
+        return jsonify({'session': None})
+
+    existing = stats_service.get_user_opinion(db, session['date'], user_id)
+    counts = stats_service.get_session_vote_counts(db, session['date'])
+    return jsonify({
+        'session': session,
+        'my_opinion': existing,
+        'vote_counts': counts,
+    })
+
+
+@app.route("/api/feedback/submit", methods=['POST'])
+def api_feedback_submit():
+    """提交本週投票（覆蓋式）。"""
+    payload = request.get_json(silent=True) or {}
+    id_token = payload.get('id_token')
+    date_str = payload.get('date')
+    played = payload.get('played')
+    pre_ranking = payload.get('pre_ranking')
+    post_ranking = payload.get('post_ranking')
+
+    if not id_token or not date_str or played is None:
+        return jsonify({'error': 'missing required fields'}), 400
+
+    user_id = verify_liff_id_token(id_token, app.config.get('LIFF_CHANNEL_ID'))
+    if not user_id:
+        return jsonify({'error': 'invalid id_token'}), 401
+
+    session = stats_service.get_feedback_session(db)
+    if not session or session['date'] != date_str:
+        return jsonify({'error': 'session not available'}), 400
+
+    valid_team_ids = {t['teamId'] for t in session['teams']}
+
+    def _valid_ranking(r):
+        if r is None:
+            return True
+        return (
+            isinstance(r, list)
+            and set(r) <= valid_team_ids
+            and len(r) == len(set(r))
+            and len(r) == len(valid_team_ids)
+        )
+
+    if not _valid_ranking(pre_ranking) or not _valid_ranking(post_ranking):
+        return jsonify({'error': 'invalid ranking'}), 400
+    if played and not post_ranking:
+        return jsonify({'error': 'played but no post_ranking'}), 400
+
+    stats_service.submit_opinion(
+        db, date_str, user_id, bool(played), pre_ranking, post_ranking,
+    )
+    counts = stats_service.get_session_vote_counts(db, date_str)
+    return jsonify({'ok': True, 'vote_counts': counts})
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5000))

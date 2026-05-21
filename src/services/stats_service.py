@@ -20,9 +20,9 @@ attendances 集合 schema（src/database/mongodb.py:107-111）：
 """
 
 from collections import Counter
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from itertools import combinations
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set
 
 from pymongo.database import Database
 
@@ -271,3 +271,136 @@ def get_group_summary(db: Database, group_id: str) -> Dict:
         "avg_team_size": avg_team_size,
         "latest_session_date": latest_date,
     }
+
+
+# ─── 預期 vs 體感 回饋（Step 1/2/3） ────────────────────────────────
+
+def get_feedback_session(db: Database) -> Optional[Dict]:
+    """取最新一場 attendance 當作本週可投票場次。"""
+    att = db.attendances.find_one(sort=[("date", -1)])
+    if not att:
+        return None
+    return {
+        "date": att.get("date", ""),
+        "teams": [
+            {
+                "teamId": t.get("teamId", ""),
+                "members": [
+                    {"userId": m.get("userId", ""), "name": m.get("name", "?")}
+                    for m in t.get("members", [])
+                ],
+            }
+            for t in att.get("teams", [])
+        ],
+    }
+
+
+def get_user_opinion(db: Database, date_str: str, user_id: str) -> Optional[Dict]:
+    doc = db.opinions.find_one({"date": date_str, "user_id": user_id})
+    if not doc:
+        return None
+    return {
+        "played": doc.get("played"),
+        "pre_ranking": doc.get("pre_ranking"),
+        "post_ranking": doc.get("post_ranking"),
+        "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None,
+    }
+
+
+def submit_opinion(
+    db: Database,
+    date_str: str,
+    user_id: str,
+    played: bool,
+    pre_ranking: Optional[List[str]],
+    post_ranking: Optional[List[str]],
+) -> None:
+    now = datetime.now(timezone.utc)
+    db.opinions.update_one(
+        {"date": date_str, "user_id": user_id},
+        {
+            "$set": {
+                "played": bool(played),
+                "pre_ranking": pre_ranking,
+                "post_ranking": post_ranking if played else None,
+                "updated_at": now,
+            },
+            "$setOnInsert": {
+                "date": date_str,
+                "user_id": user_id,
+                "created_at": now,
+            },
+        },
+        upsert=True,
+    )
+
+
+def get_session_vote_counts(db: Database, date_str: str) -> Dict[str, int]:
+    """某場累積的 pre/post 投票數。"""
+    pre = db.opinions.count_documents({"date": date_str, "pre_ranking": {"$ne": None}})
+    post = db.opinions.count_documents({"date": date_str, "post_ranking": {"$ne": None}})
+    return {"pre_votes": pre, "post_votes": post}
+
+
+def get_team_estimation_ranking(
+    db: Database,
+    min_votes: int = 3,
+    top_n: int = 5,
+) -> Dict[str, List[Dict]]:
+    """各場每隊：預期平均名次 vs 體感平均名次。
+    delta > 0 → 被高估；delta < 0 → 被低估。
+    僅納入 pre 與 post 都達 min_votes 的場次。"""
+    sessions: Dict[str, Dict[str, List[List[str]]]] = {}
+    for op in db.opinions.find():
+        ds = op.get("date")
+        if not ds:
+            continue
+        bucket = sessions.setdefault(ds, {"pre": [], "post": []})
+        if op.get("pre_ranking"):
+            bucket["pre"].append(op["pre_ranking"])
+        if op.get("played") and op.get("post_ranking"):
+            bucket["post"].append(op["post_ranking"])
+
+    rows: List[Dict] = []
+    for ds, data in sessions.items():
+        if len(data["pre"]) < min_votes or len(data["post"]) < min_votes:
+            continue
+        att = db.attendances.find_one({"date": ds})
+        if not att:
+            continue
+        team_members = {
+            t.get("teamId", ""): [m.get("name", "?") for m in t.get("members", [])]
+            for t in att.get("teams", [])
+        }
+        team_ids = list(team_members.keys())
+
+        def _avg(votes: List[List[str]]) -> Dict[str, float]:
+            sums: Dict[str, float] = {tid: 0.0 for tid in team_ids}
+            counts: Dict[str, int] = {tid: 0 for tid in team_ids}
+            for ranking in votes:
+                for idx, tid in enumerate(ranking):
+                    if tid in sums:
+                        sums[tid] += idx + 1
+                        counts[tid] += 1
+            return {tid: sums[tid] / counts[tid] for tid in team_ids if counts[tid] > 0}
+
+        pre_avg = _avg(data["pre"])
+        post_avg = _avg(data["post"])
+
+        for tid in team_ids:
+            if tid not in pre_avg or tid not in post_avg:
+                continue
+            rows.append({
+                "date": ds,
+                "team_id": tid,
+                "members": team_members.get(tid, []),
+                "predicted_rank": round(pre_avg[tid], 2),
+                "felt_rank": round(post_avg[tid], 2),
+                "delta": round(post_avg[tid] - pre_avg[tid], 2),
+                "pre_votes": len(data["pre"]),
+                "post_votes": len(data["post"]),
+            })
+
+    overrated = sorted(rows, key=lambda r: -r["delta"])[:top_n]
+    underrated = sorted(rows, key=lambda r: r["delta"])[:top_n]
+    return {"min_votes": min_votes, "overrated": overrated, "underrated": underrated}

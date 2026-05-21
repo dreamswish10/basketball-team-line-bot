@@ -110,6 +110,15 @@ def create_indexes():
         db.attendances.create_index([("teams.members.userId", ASCENDING)], name="user_attendances")
         db.attendances.create_index([("teams.teamId", ASCENDING)], name="team_id")
 
+        # Opinions collection indexes (Step 1/2/3 回饋)
+        logger.info("Creating indexes for 'opinions' collection...")
+        db.opinions.create_index(
+            [("date", ASCENDING), ("user_id", ASCENDING)],
+            unique=True,
+            name="date_user_unique",
+        )
+        db.opinions.create_index([("date", DESCENDING)], name="date_desc")
+
         # AliasMap collection indexes
         logger.info("Creating indexes for 'aliasMap' collection...")
         db.aliasMap.create_index([("userId", ASCENDING)], unique=True, name="userId_unique")
