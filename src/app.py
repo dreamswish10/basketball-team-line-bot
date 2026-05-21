@@ -483,6 +483,7 @@ def api_group_data():
         'divisions': stats_service.get_recent_divisions(db, group_id),
         'players': stats_service.get_player_stats(db, group_id),
         'pairs': stats_service.get_pair_cooccurrence(db, group_id),
+        'trios': stats_service.get_trio_cooccurrence(db, group_id),
     })
 
 if __name__ == "__main__":

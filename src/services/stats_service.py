@@ -83,7 +83,7 @@ def get_player_stats(db: Database, group_id: str) -> List[Dict]:
     return rows
 
 
-def get_pair_cooccurrence(db: Database, group_id: str, top_n: int = 10) -> Dict[str, List[Dict]]:
+def get_pair_cooccurrence(db: Database, group_id: str, top_n: int = 5) -> Dict[str, List[Dict]]:
     """兩兩同隊次數。回傳 most_common 與 least_common（least 只含至少出場過一次的雙方）。"""
     pair_counter: Counter = Counter()
     name_lookup: Dict[str, str] = {}
@@ -119,6 +119,36 @@ def get_pair_cooccurrence(db: Database, group_id: str, top_n: int = 10) -> Dict[
     most_common = [_format(p, c) for p, c in sorted_pairs[::-1][:top_n]]
     least_common = [_format(p, c) for p, c in sorted_pairs[:top_n]]
     return {"most_common": most_common, "least_common": least_common}
+
+
+def get_trio_cooccurrence(db: Database, group_id: str, top_n: int = 5) -> List[Dict]:
+    """三人同隊次數，回傳最常出現的 top_n 組（次數 > 0）。"""
+    trio_counter: Counter = Counter()
+    name_lookup: Dict[str, str] = {}
+
+    for att in db.attendances.find():
+        for team in att.get("teams", []):
+            keys_in_team = []
+            for m in team.get("members", []):
+                key = _member_key(m)
+                if not key:
+                    continue
+                keys_in_team.append(key)
+                if m.get("name"):
+                    name_lookup.setdefault(key, m["name"])
+            for a, b, c in combinations(sorted(set(keys_in_team)), 3):
+                trio_counter[(a, b, c)] += 1
+
+    top = trio_counter.most_common(top_n)
+    return [
+        {
+            "names": [name_lookup.get(a, "Unknown"),
+                      name_lookup.get(b, "Unknown"),
+                      name_lookup.get(c, "Unknown")],
+            "count": count,
+        }
+        for (a, b, c), count in top
+    ]
 
 
 def get_group_summary(db: Database, group_id: str) -> Dict:

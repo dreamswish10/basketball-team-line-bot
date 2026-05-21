@@ -104,12 +104,16 @@
 
     <section id="pairs" class="section">
       <div class="card">
-        <h2>最常同隊（前 10）</h2>
+        <h2>最常同隊（前 5）</h2>
         <div id="pairs-most-body"></div>
       </div>
       <div class="card">
-        <h2>最少同隊（前 10）</h2>
+        <h2>最少同隊（前 5）</h2>
         <div id="pairs-least-body"></div>
+      </div>
+      <div class="card">
+        <h2>最常同隊三人組（前 5）</h2>
+        <div id="trios-body"></div>
       </div>
     </section>
   </main>
@@ -185,6 +189,14 @@
       document.getElementById('pairs-least-body').innerHTML = fmt(pairs.least_common || []);
     }
 
+    function renderTrios(trios) {
+      const el = document.getElementById('trios-body');
+      if (!trios.length) { el.textContent = '尚無資料'; return; }
+      el.innerHTML = `<table><tbody>${trios.map(t =>
+        `<tr><td>${t.names.map(escapeHtml).join(' × ')}</td><td>${t.count}</td></tr>`
+      ).join('')}</tbody></table>`;
+    }
+
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, c => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -246,6 +258,7 @@
       renderDivisions(data.divisions || []);
       renderPlayers(data.players || []);
       renderPairs(data.pairs || {});
+      renderTrios(data.trios || []);
 
       document.getElementById('loading').hidden = true;
       document.getElementById('app').hidden = false;
