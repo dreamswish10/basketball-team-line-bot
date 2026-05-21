@@ -476,14 +476,7 @@ def api_group_data():
     if not user_id:
         return jsonify({'error': 'invalid id_token'}), 401
 
-    member = db.group_members.find_one({
-        'group_id': group_id,
-        'user_id': user_id,
-        'is_active': True,
-    })
-    if not member:
-        app.logger.info(f"[VIEW] User {user_id} not in group {group_id}")
-        return jsonify({'error': 'not a member of this group'}), 403
+    app.logger.info(f"[VIEW] User {user_id} accessed group {group_id}")
 
     return jsonify({
         'summary': stats_service.get_group_summary(db, group_id),
