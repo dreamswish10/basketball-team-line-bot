@@ -113,7 +113,7 @@ def get_pair_cooccurrence(db: Database, group_id: str, top_n: int = 5) -> Dict[s
 
 
 def get_trio_cooccurrence(
-    db: Database, group_id: str, top_n: int = 5, never_top_n: int = 10
+    db: Database, group_id: str, top_n: int = 5, never_top_n: int = 100
 ) -> Dict[str, List[Dict]]:
     """三人同隊統計：最常 top_n 組 + 還沒同隊過 never_top_n 組。
     『還沒同隊』按三人出場總場次 desc 排（越活躍越優先）。"""

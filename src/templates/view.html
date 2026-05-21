@@ -65,6 +65,8 @@
     .tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
     .section { display: none; }
     .section.active { display: block; }
+    .hint { font-size: 0.8rem; color: var(--muted); margin: 0 0 10px; line-height: 1.4; }
+    .scroll-list { max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
   </style>
 </head>
 <body>
@@ -112,8 +114,9 @@
         <div id="trios-most-body"></div>
       </div>
       <div class="card">
-        <h2>還沒同隊過的三人組（前 10）</h2>
-        <div id="trios-never-body"></div>
+        <h2>還沒同隊過的三人組（前 100）</h2>
+        <p class="hint">三人都打過球、但從沒被分到同一隊。依「三人合計出場」由多到少排序，越上面代表越值得安排試試。</p>
+        <div id="trios-never-body" class="scroll-list"></div>
       </div>
     </section>
   </main>
