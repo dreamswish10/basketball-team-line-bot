@@ -99,7 +99,17 @@
 
     <section id="players" class="section">
       <div class="card">
-        <h2>球員出場</h2>
+        <h2 id="stars-title">近 30 天之星</h2>
+        <p class="hint">最近 30 天內出場次數最多的前 5 名。</p>
+        <div id="stars-body"></div>
+      </div>
+      <div class="card">
+        <h2 id="dormant-title">失聯成員</h2>
+        <p class="hint">出場 3 次以上，但最近 30 天沒出現的玩家。可以揪一下。</p>
+        <div id="dormant-body"></div>
+      </div>
+      <div class="card">
+        <h2>球員出場（全部）</h2>
         <div id="players-body"></div>
       </div>
     </section>
@@ -168,6 +178,28 @@
         }).join('');
         return `<div class="division"><div class="division-date">${escapeHtml(d.date)}</div>${teams}</div>`;
       }).join('');
+    }
+
+    function renderStars(data) {
+      const stars = data.stars || [];
+      if (data.days) document.getElementById('stars-title').textContent = `近 ${data.days} 天之星`;
+      document.getElementById('stars-body').innerHTML = stars.length
+        ? `<table><thead><tr><th>名次</th><th>名字</th><th>出場</th></tr></thead><tbody>${stars.map((s, i) =>
+            `<tr><td>${i + 1}</td><td>${escapeHtml(s.name)}</td><td>${s.appearances}</td></tr>`
+          ).join('')}</tbody></table>`
+        : '近期沒有出場紀錄';
+    }
+
+    function renderDormant(data) {
+      const members = data.members || [];
+      if (data.dormant_days) {
+        document.getElementById('dormant-title').textContent = `失聯成員（${data.dormant_days} 天內沒出現）`;
+      }
+      document.getElementById('dormant-body').innerHTML = members.length
+        ? `<table><thead><tr><th>名字</th><th>累計出場</th><th>最近一次</th><th>距今</th></tr></thead><tbody>${members.map(m =>
+            `<tr><td>${escapeHtml(m.name)}</td><td>${m.appearances}</td><td>${escapeHtml(m.last_seen || '—')}</td><td>${m.days_ago != null ? m.days_ago + ' 天' : '—'}</td></tr>`
+          ).join('')}</tbody></table>`
+        : '沒有失聯成員 🎉';
     }
 
     function renderPlayers(players) {
@@ -268,6 +300,8 @@
       const data = await res.json();
       renderSummary(data.summary || {});
       renderDivisions(data.divisions || []);
+      renderStars(data.recent_stars || {});
+      renderDormant(data.dormant_members || {});
       renderPlayers(data.players || []);
       renderPairs(data.pairs || {});
       renderTrios(data.trios || []);

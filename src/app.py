@@ -484,6 +484,8 @@ def api_group_data():
         'players': stats_service.get_player_stats(db, group_id),
         'pairs': stats_service.get_pair_cooccurrence(db, group_id),
         'trios': stats_service.get_trio_cooccurrence(db, group_id),
+        'recent_stars': stats_service.get_recent_stars(db, group_id),
+        'dormant_members': stats_service.get_dormant_members(db, group_id),
     })
 
 if __name__ == "__main__":

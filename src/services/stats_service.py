@@ -20,6 +20,7 @@ attendances 集合 schema（src/database/mongodb.py:107-111）：
 """
 
 from collections import Counter
+from datetime import date, timedelta
 from itertools import combinations
 from typing import Dict, List, Set
 
@@ -163,6 +164,78 @@ def get_trio_cooccurrence(
     ]
 
     return {"most_common": most_common, "never_together": never_together}
+
+
+def get_recent_stars(db: Database, group_id: str, days: int = 30, limit: int = 5) -> Dict:
+    """近 N 天出場排行。"""
+    cutoff = (date.today() - timedelta(days=days)).isoformat()
+    appearance_count: Counter = Counter()
+    name_lookup: Dict[str, str] = {}
+
+    for att in db.attendances.find({"date": {"$gte": cutoff}}):
+        for team in att.get("teams", []):
+            for m in team.get("members", []):
+                key = _member_key(m)
+                if not key:
+                    continue
+                appearance_count[key] += 1
+                if m.get("name"):
+                    name_lookup.setdefault(key, m["name"])
+
+    stars = [
+        {"name": name_lookup.get(key, "Unknown"), "appearances": count}
+        for key, count in appearance_count.most_common(limit)
+    ]
+    return {"days": days, "stars": stars}
+
+
+def get_dormant_members(
+    db: Database,
+    group_id: str,
+    dormant_days: int = 30,
+    min_appearances: int = 3,
+    limit: int = 10,
+) -> Dict:
+    """常打但最近 N 天沒出現的玩家。"""
+    cutoff = (date.today() - timedelta(days=dormant_days)).isoformat()
+    appearance_count: Counter = Counter()
+    last_seen: Dict[str, str] = {}
+    name_lookup: Dict[str, str] = {}
+
+    for att in db.attendances.find().sort("date", -1):
+        d = att.get("date", "")
+        for team in att.get("teams", []):
+            for m in team.get("members", []):
+                key = _member_key(m)
+                if not key:
+                    continue
+                appearance_count[key] += 1
+                if key not in last_seen and d:
+                    last_seen[key] = d
+                if m.get("name"):
+                    name_lookup.setdefault(key, m["name"])
+
+    today = date.today()
+    rows = []
+    for key, count in appearance_count.items():
+        if count < min_appearances:
+            continue
+        ls = last_seen.get(key, "")
+        if not ls or ls >= cutoff:
+            continue
+        try:
+            days_ago = (today - date.fromisoformat(ls)).days
+        except ValueError:
+            days_ago = None
+        rows.append({
+            "name": name_lookup.get(key, "Unknown"),
+            "appearances": count,
+            "last_seen": ls,
+            "days_ago": days_ago,
+        })
+
+    rows.sort(key=lambda r: (r["last_seen"], -r["appearances"]))
+    return {"dormant_days": dormant_days, "min_appearances": min_appearances, "members": rows[:limit]}
 
 
 def get_group_summary(db: Database, group_id: str) -> Dict:
