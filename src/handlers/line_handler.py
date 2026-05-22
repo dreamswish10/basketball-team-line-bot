@@ -243,6 +243,12 @@ class LineMessageHandler:
                     self._handle_feedback_command(event, group_id)
                 else:
                     self._send_message(event.reply_token, "❌ 此指令只能在群組中使用")
+            elif message_text.startswith('/votes') or message_text.startswith('/投票'):
+                self._log_info(f"[COMMAND] Matched: /votes, User: {user_id}")
+                if is_group:
+                    self._handle_votes_command(event, group_id)
+                else:
+                    self._send_message(event.reply_token, "❌ 此指令只能在群組中使用")
             elif message_text.startswith('/register') or message_text.startswith('註冊'):
                 self._log_info(f"[COMMAND] Matched: /register, User: {user_id}")
                 self._handle_register_command(event, message_text, group_id)
@@ -1346,6 +1352,57 @@ class LineMessageHandler:
         except Exception as e:
             self._log_error(f"[VIEW] Error generating LIFF link: {e}")
             self._send_message(event.reply_token, "❌ 產生連結失敗，請稍後再試")
+
+    def _handle_votes_command(self, event, group_id):
+        """顯示本週投票進度（誰投了 pre / post）。"""
+        try:
+            from linebot.exceptions import LineBotApiError
+            from src.services import stats_service
+
+            db = get_database()
+            session = stats_service.get_feedback_session(db)
+            if not session:
+                self._send_message(event.reply_token, "本週還沒有分隊紀錄，沒有可投票場次")
+                return
+
+            date_str = session["date"]
+            name_lookup = {}
+            for team in session["teams"]:
+                for m in team["members"]:
+                    if m.get("userId") and m.get("name"):
+                        name_lookup[m["userId"]] = m["name"]
+
+            def resolve_name(uid):
+                if uid in name_lookup:
+                    return name_lookup[uid]
+                try:
+                    profile = self.line_bot_api.get_group_member_profile(group_id, uid)
+                    return profile.display_name
+                except LineBotApiError:
+                    return f"User_{uid[-6:]}"
+
+            pre_voters = []
+            post_voters = []
+            for op in db.opinions.find({"date": date_str}):
+                uid = op.get("user_id")
+                if not uid:
+                    continue
+                if op.get("pre_ranking"):
+                    pre_voters.append(resolve_name(uid))
+                if op.get("played") and op.get("post_ranking"):
+                    post_voters.append(resolve_name(uid))
+
+            lines = [f"📊 本週投票進度（{date_str}）"]
+            lines.append(f"預期：{len(pre_voters)} 人")
+            if pre_voters:
+                lines.append("   • " + "、".join(pre_voters))
+            lines.append(f"體感：{len(post_voters)} 人")
+            if post_voters:
+                lines.append("   • " + "、".join(post_voters))
+            self._send_message(event.reply_token, "\n".join(lines))
+        except Exception as e:
+            self._log_error(f"[VOTES] Error: {e}")
+            self._send_message(event.reply_token, "❌ 查詢失敗，請稍後再試")
 
     def _handle_feedback_command(self, event, group_id):
         """產生並發送 LIFF 回饋連結（獨立 LIFF app）。"""
