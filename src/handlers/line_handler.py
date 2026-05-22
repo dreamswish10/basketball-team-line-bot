@@ -1348,15 +1348,15 @@ class LineMessageHandler:
             self._send_message(event.reply_token, "❌ 產生連結失敗，請稍後再試")
 
     def _handle_feedback_command(self, event, group_id):
-        """產生並發送 LIFF 回饋連結，直接帶到回饋 tab。"""
+        """產生並發送 LIFF 回饋連結（獨立 LIFF app）。"""
         try:
             from src.config import Config
-            liff_id = Config.LIFF_ID
+            liff_id = Config.LIFF_ID_FEEDBACK
             if not liff_id:
-                self._send_message(event.reply_token, "❌ 尚未設定 LIFF_ID，無法產生連結")
+                self._send_message(event.reply_token, "❌ 尚未設定 LIFF_ID_FEEDBACK，無法產生連結")
                 return
 
-            url = f"https://liff.line.me/{liff_id}?group_id={group_id}&tab=feedback"
+            url = f"https://liff.line.me/{liff_id}?group_id={group_id}"
             message = (
                 "📝 本週分隊「預期 vs 體感」投票\n"
                 f"{url}\n\n"

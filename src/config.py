@@ -25,6 +25,7 @@ class Config:
     # LIFF_CHANNEL_ID：該 LINE Login channel 的 Channel ID（非 secret），
     # 用來向 LINE 驗證 id_token 的 audience
     LIFF_ID = os.getenv('LIFF_ID', '')
+    LIFF_ID_FEEDBACK = os.getenv('LIFF_ID_FEEDBACK', '')
     LIFF_CHANNEL_ID = os.getenv('LIFF_CHANNEL_ID', '')
     PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL', '')
     

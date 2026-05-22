@@ -463,6 +463,12 @@ def view_page():
     return render_template('view.html', liff_id=app.config.get('LIFF_ID', ''))
 
 
+@app.route("/feedback")
+def feedback_page():
+    """LIFF 投票頁。獨立 LIFF app，使用 LIFF_ID_FEEDBACK。"""
+    return render_template('feedback.html', liff_id=app.config.get('LIFF_ID_FEEDBACK', ''))
+
+
 @app.route("/api/group_data", methods=['POST'])
 def api_group_data():
     payload = request.get_json(silent=True) or {}

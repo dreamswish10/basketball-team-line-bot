@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>本週投票 — 預期 vs 體感</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --primary: #06c755;
+      --border: #e5e7eb;
+      --highlight: #ecfdf5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans TC", sans-serif;
+      background: var(--bg); color: var(--text); font-size: 15px;
+    }
+    h1 { font-size: 1.25rem; margin: 0 0 12px; }
+    h2 { font-size: 1rem; margin: 0 0 8px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px; margin-bottom: 14px;
+    }
+    .hint { font-size: 0.8rem; color: var(--muted); margin: 0 0 10px; line-height: 1.4; }
+    #loading, #error {
+      text-align: center; padding: 24px; color: var(--muted);
+    }
+    #error { color: #b91c1c; }
+    .step { margin-bottom: 14px; }
+    .step-title { font-weight: 600; margin-bottom: 8px; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px;
+      background: #fff; color: var(--text); font-size: 0.9rem; cursor: pointer;
+    }
+    .btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .btn.selected { background: #dcfce7; border-color: var(--primary); color: #047857; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .rank-list { display: flex; flex-direction: column; gap: 6px; }
+    .rank-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+      background: #fafafa;
+    }
+    .rank-num {
+      flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+      background: var(--primary); color: #fff; font-weight: 600;
+      display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+    }
+    .rank-body { flex: 1; min-width: 0; }
+    .rank-team-id { font-weight: 600; font-size: 0.85rem; }
+    .rank-members { font-size: 0.75rem; color: var(--muted); margin-top: 2px; word-break: break-word; }
+    .rank-arrows { display: flex; flex-direction: column; gap: 2px; }
+    .rank-arrow {
+      width: 28px; height: 22px; border: 1px solid var(--border); border-radius: 4px;
+      background: #fff; font-size: 0.7rem; cursor: pointer; line-height: 1;
+    }
+    .rank-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+    .submitted-row { padding: 6px 0; font-size: 0.85rem; }
+    .submitted-row .label { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div id="loading">載入中…</div>
+  <div id="error" hidden></div>
+
+  <main id="app" hidden>
+    <h1 id="page-title">本週投票</h1>
+    <div class="card">
+      <p class="hint">沒到場也能填預測（Step 1 選「沒」），到場的人多填一份體感。比對預期 vs 實際後，「最被高估 / 低估的隊伍」會出現在 /view 的「預期 vs 體感」tab。</p>
+      <div id="feedback-body"></div>
+    </div>
+  </main>
+
+  <script>
+    const LIFF_ID = "{{ liff_id }}";
+
+    let _liffIdToken = null;
+    let _session = null;
+    let _myOpinion = null;
+    let _voteCounts = { pre_votes: 0, post_votes: 0 };
+    let _stepperState = { played: null, pre_ranking: [], post_ranking: [], editing: false };
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = '錯誤：' + msg;
+      el.hidden = false;
+      document.getElementById('loading').hidden = true;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+      ));
+    }
+
+    function teamIdsDefault() {
+      return _session.teams.map(t => t.teamId);
+    }
+
+    function formatRanking(r) {
+      if (!r || !r.length) return '—';
+      return r.map((tid, i) => `#${i + 1} ${escapeHtml(tid)}`).join(' → ');
+    }
+
+    function renderMyOpinion() {
+      return `
+        <div class="submitted-row">✅ 你已投票（${escapeHtml(_session.date)}）</div>
+        <div class="submitted-row"><span class="label">參加：</span>${_myOpinion.played ? '有' : '沒'}</div>
+        <div class="submitted-row"><span class="label">預期排名：</span>${formatRanking(_myOpinion.pre_ranking)}</div>
+        ${_myOpinion.played ? `<div class="submitted-row"><span class="label">體感排名：</span>${formatRanking(_myOpinion.post_ranking)}</div>` : ''}
+        <div class="submitted-row"><span class="label">目前累積：</span>預期 ${_voteCounts.pre_votes} 票 / 體感 ${_voteCounts.post_votes} 票</div>
+        <button id="reopen-btn" class="btn" style="margin-top: 8px;">重投</button>
+      `;
+    }
+
+    function renderRankList(ranking, prefix) {
+      const lookup = {};
+      _session.teams.forEach(t => lookup[t.teamId] = t);
+      return ranking.map((tid, i) => {
+        const team = lookup[tid] || { teamId: tid, members: [] };
+        const names = team.members.map(m => m.name).join('、');
+        return `
+          <div class="rank-item">
+            <div class="rank-num">${i + 1}</div>
+            <div class="rank-body">
+              <div class="rank-team-id">${escapeHtml(team.teamId)}</div>
+              <div class="rank-members">${escapeHtml(names) || '—'}</div>
+            </div>
+            <div class="rank-arrows">
+              <button class="rank-arrow" data-prefix="${prefix}" data-idx="${i}" data-dir="up" ${i === 0 ? 'disabled' : ''}>▲</button>
+              <button class="rank-arrow" data-prefix="${prefix}" data-idx="${i}" data-dir="down" ${i === ranking.length - 1 ? 'disabled' : ''}>▼</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderStepper() {
+      const s = _stepperState;
+      const step1 = `
+        <div class="step">
+          <div class="step-title">Step 1. 你今天有參與打球嗎？</div>
+          <div class="btn-row">
+            <button class="btn ${s.played === true ? 'selected' : ''}" data-played="true">有</button>
+            <button class="btn ${s.played === false ? 'selected' : ''}" data-played="false">沒</button>
+          </div>
+        </div>
+      `;
+      const step2 = (s.played !== null) ? `
+        <div class="step">
+          <div class="step-title">Step 2. 你預期哪些隊「會在場上待久」（強 → 弱）</div>
+          <div class="rank-list">${renderRankList(s.pre_ranking, 'pre')}</div>
+        </div>
+      ` : '';
+      const step3 = (s.played === true) ? `
+        <div class="step">
+          <div class="step-title">Step 3. 打完後你體感的排名（強 → 弱）</div>
+          <div class="rank-list">${renderRankList(s.post_ranking, 'post')}</div>
+        </div>
+      ` : '';
+      const submit = `
+        <div class="step">
+          <button class="btn primary" id="submit-btn" ${s.played === null ? 'disabled' : ''}>送出</button>
+        </div>
+      `;
+      return step1 + step2 + step3 + submit;
+    }
+
+    function renderBody() {
+      const el = document.getElementById('feedback-body');
+      if (!_session) {
+        el.innerHTML = '<div class="hint">本週還沒有分隊紀錄，等管理員 /record 之後再來投票。</div>';
+        return;
+      }
+      document.getElementById('page-title').textContent = `本週投票 — ${_session.date}`;
+
+      if (_myOpinion && !_stepperState.editing) {
+        el.innerHTML = renderMyOpinion();
+        document.getElementById('reopen-btn').addEventListener('click', () => {
+          _stepperState = {
+            played: _myOpinion.played,
+            pre_ranking: [...(_myOpinion.pre_ranking || teamIdsDefault())],
+            post_ranking: [...(_myOpinion.post_ranking || teamIdsDefault())],
+            editing: true,
+          };
+          renderBody();
+        });
+        return;
+      }
+
+      if (!_stepperState.pre_ranking.length) _stepperState.pre_ranking = teamIdsDefault();
+      if (!_stepperState.post_ranking.length) _stepperState.post_ranking = teamIdsDefault();
+
+      el.innerHTML = renderStepper();
+      attachStepperListeners();
+    }
+
+    function attachStepperListeners() {
+      document.querySelectorAll('[data-played]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          _stepperState.played = btn.dataset.played === 'true';
+          renderBody();
+        });
+      });
+      document.querySelectorAll('.rank-arrow').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const arr = btn.dataset.prefix === 'pre' ? _stepperState.pre_ranking : _stepperState.post_ranking;
+          const idx = parseInt(btn.dataset.idx, 10);
+          const j = btn.dataset.dir === 'up' ? idx - 1 : idx + 1;
+          [arr[idx], arr[j]] = [arr[j], arr[idx]];
+          renderBody();
+        });
+      });
+      const submitBtn = document.getElementById('submit-btn');
+      if (submitBtn) submitBtn.addEventListener('click', submitFeedback);
+    }
+
+    async function submitFeedback() {
+      const s = _stepperState;
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true; btn.textContent = '送出中…';
+      try {
+        const res = await fetch('/api/feedback/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id_token: _liffIdToken,
+            date: _session.date,
+            played: s.played,
+            pre_ranking: s.pre_ranking,
+            post_ranking: s.played ? s.post_ranking : null,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          btn.disabled = false; btn.textContent = '送出';
+          alert('送出失敗：' + (data.error || res.status));
+          return;
+        }
+        _myOpinion = {
+          played: s.played,
+          pre_ranking: s.pre_ranking,
+          post_ranking: s.played ? s.post_ranking : null,
+        };
+        _voteCounts = data.vote_counts || _voteCounts;
+        _stepperState = { played: null, pre_ranking: [], post_ranking: [], editing: false };
+        renderBody();
+      } catch (e) {
+        btn.disabled = false; btn.textContent = '送出';
+        alert('連線失敗：' + e.message);
+      }
+    }
+
+    async function main() {
+      if (!LIFF_ID) {
+        showError('伺服器未設定 LIFF_ID_FEEDBACK');
+        return;
+      }
+      try {
+        await liff.init({ liffId: LIFF_ID });
+      } catch (e) {
+        showError('LIFF 初始化失敗：' + e.message);
+        return;
+      }
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+
+      _liffIdToken = liff.getIDToken();
+
+      try {
+        const res = await fetch('/api/feedback/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id_token: _liffIdToken }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showError(data.error || ('HTTP ' + res.status));
+          return;
+        }
+        _session = data.session;
+        _myOpinion = data.my_opinion;
+        _voteCounts = data.vote_counts || _voteCounts;
+      } catch (e) {
+        showError('連線失敗：' + e.message);
+        return;
+      }
+
+      renderBody();
+      document.getElementById('loading').hidden = true;
+      document.getElementById('app').hidden = false;
+    }
+
+    main().catch(e => showError(e.message));
+  </script>
+</body>
+</html>
