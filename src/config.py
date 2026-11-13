@@ -40,6 +40,12 @@ class Config:
     MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/')
     MONGODB_DB_NAME = os.getenv('MONGODB_DB_NAME', 'basketball_team_bot')
     
+    # AI 助理（/ai 指令）。API key 由 Anthropic SDK 直接讀 ANTHROPIC_API_KEY，
+    # 這裡只列出來方便檢查；沒設定時 /ai 會回覆「尚未設定」，其他指令不受影響。
+    ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+    AI_MODEL = os.getenv('AI_MODEL', 'claude-opus-5-5')
+    AI_EFFORT = os.getenv('AI_EFFORT', 'medium')
+
     # 分隊設定
     DEFAULT_SKILL_VALUE = 5
     MIN_SKILL_VALUE = 1

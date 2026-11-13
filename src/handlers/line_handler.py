@@ -28,6 +28,7 @@ except ImportError:
             SpacerComponent = None
 from src.models.mongodb_models import AliasMapRepository, AttendancesRepository
 from src.database.mongodb import get_database
+from src.services.ai_service import AIAssistant
 import random
 
 class LineMessageHandler:
@@ -46,6 +47,17 @@ class LineMessageHandler:
         
         # 暫存多組分隊結果 (key: user_id, value: {"options": [...], "mapping_info": {...}, "timestamp": ...})
         self.pending_team_selections = {}
+
+        # AI 助理（/ai 指令）：沿用既有的別名對應、權重分隊與寫入邏輯
+        self.ai_assistant = AIAssistant(
+            db,
+            resolve_players=self._create_players_from_names,
+            suggest_teams=lambda groups, individuals, avoid: self._generate_weighted_team_options_with_groups(
+                groups, individuals, num_options=1, avoid_recent_count=avoid
+            ),
+            store_teams=lambda teams: self._store_team_result(teams, context="ai"),
+            logger=logger,
+        )
     
     def _store_pending_team_selection(self, user_id, team_options, mapping_info):
         """暫存使用者的分隊選項"""
@@ -207,7 +219,10 @@ class LineMessageHandler:
                 self._log_info(f"[GROUP] Group ID: {group_id}")
             
             # 根據指令路由到不同的處理函數
-            if message_text.startswith('/group_team') or message_text.startswith('群組分隊'):
+            if re.match(r'^/ai(\s|$)', message_text, re.IGNORECASE):
+                self._log_info(f"[COMMAND] Matched: /ai, User: {user_id}")
+                self._handle_ai_command(event, message_text, group_id or user_id)
+            elif message_text.startswith('/group_team') or message_text.startswith('群組分隊'):
                 self._log_info(f"[COMMAND] Matched: /group_team, User: {user_id}")
                 if is_group:
                     self._handle_group_team_command(event, message_text, group_id)
@@ -555,7 +570,9 @@ class LineMessageHandler:
         message += "🔸 /record 隊伍1:成員 隊伍2:成員\n"
         message += "   手動記錄分隊結果\n"
         message += "🔸 /查詢\n"
-        message += "   查看個人組隊記錄\n\n"
+        message += "   查看個人組隊記錄\n"
+        message += "🔸 /ai 問題或要求\n"
+        message += "   AI 助理：問紀錄、幫忙分隊、記事情\n\n"
         message += "📖 使用範例：\n"
         if is_group:
             message += "• /group_team 2 (群組快速分隊)\n"
@@ -1403,6 +1420,44 @@ class LineMessageHandler:
         except Exception as e:
             self._log_error(f"[VOTES] Error: {e}")
             self._send_message(event.reply_token, "❌ 查詢失敗，請稍後再試")
+
+    def _handle_ai_command(self, event, message_text, scope_id):
+        """/ai <問題或要求>：交給 AI 助理（問紀錄、分隊、記事情）"""
+        question = re.sub(r'^/ai\s*', '', message_text, flags=re.IGNORECASE).strip()
+
+        if not question:
+            self._send_message(event.reply_token,
+                "🤖 AI 助理使用方式\n\n"
+                "🔸 /ai 我最常跟誰同隊？\n"
+                "🔸 /ai 幫忙分隊：🥛、凱、豪、金、kin、勇，凱跟豪不要同隊\n"
+                "🔸 /ai 記住阿明膝蓋受傷，這個月不要排他\n"
+                "🔸 /ai 你記得哪些事？\n"
+                "🔸 /ai reset（清掉最近的對話，長期筆記會保留）")
+            return
+
+        if question.lower() in ('reset', '重置', '清除對話'):
+            deleted = self.ai_assistant.reset_conversation(scope_id)
+            self._send_message(event.reply_token, f"🧹 已清掉最近的對話（{deleted} 則），長期筆記還在。")
+            return
+
+        answer = self.ai_assistant.ask(scope_id, question)
+        self._reply_or_push(event.reply_token, scope_id, answer)
+
+    def _reply_or_push(self, reply_token, target_id, text):
+        """先用 reply token 回覆；AI 想太久導致 token 失效時改用 push。"""
+        # LINE 單則文字上限 5000 字、一次最多 5 則
+        chunks = [text[i:i + 4500] for i in range(0, len(text), 4500)][:5] or ["（沒有內容）"]
+        messages = [TextSendMessage(text=chunk) for chunk in chunks]
+        try:
+            self.line_bot_api.reply_message(reply_token, messages)
+            self._log_info("[SUCCESS] AI answer sent via reply")
+        except Exception as e:
+            self._log_warning(f"[AI] reply failed ({e}); falling back to push")
+            try:
+                self.line_bot_api.push_message(target_id, messages)
+                self._log_info("[SUCCESS] AI answer sent via push")
+            except Exception as push_error:
+                self._log_error(f"[ERROR] AI answer could not be delivered: {push_error}")
 
     def _handle_feedback_command(self, event, group_id):
         """產生並發送 LIFF 回饋連結（獨立 LIFF app）。"""

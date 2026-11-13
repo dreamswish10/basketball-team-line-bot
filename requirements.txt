@@ -21,3 +21,6 @@ python-dateutil>=2.8.2
 
 # MongoDB 資料庫
 pymongo>=4.6.0
+
+# Claude API（/ai 指令的 AI 助理；需要 Python >= 3.10）
+anthropic>=2.0,<3

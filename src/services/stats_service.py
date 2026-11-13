@@ -113,6 +113,53 @@ def get_pair_cooccurrence(db: Database, group_id: str, top_n: int = 5) -> Dict[s
     return {"most_common": most_common}
 
 
+def get_teammate_stats(db: Database, player_key: str) -> Dict:
+    """某位玩家跟每個人的同隊次數與同場（同一天出場）次數。
+    player_key 是 attendances 裡的 userId（或沒有 userId 時的名字）。"""
+    same_team: Counter = Counter()
+    same_session: Counter = Counter()
+    name_lookup: Dict[str, str] = {}
+    appearances = 0
+
+    for att in db.attendances.find():
+        my_team: Optional[Set[str]] = None
+        everyone: Set[str] = set()
+        for team in att.get("teams", []):
+            keys = set()
+            for m in team.get("members", []):
+                key = _member_key(m)
+                if not key:
+                    continue
+                keys.add(key)
+                if m.get("name"):
+                    name_lookup.setdefault(key, m["name"])
+            everyone |= keys
+            if player_key in keys:
+                my_team = keys
+        if my_team is None:
+            continue
+        appearances += 1
+        for key in everyone - {player_key}:
+            same_session[key] += 1
+        for key in my_team - {player_key}:
+            same_team[key] += 1
+
+    teammates = [
+        {
+            "name": name_lookup.get(key, key),
+            "times_same_team": same_team.get(key, 0),
+            "times_same_session": count,
+        }
+        for key, count in same_session.items()
+    ]
+    teammates.sort(key=lambda r: (-r["times_same_team"], -r["times_same_session"], r["name"]))
+    return {
+        "player": name_lookup.get(player_key, player_key),
+        "appearances": appearances,
+        "teammates": teammates,
+    }
+
+
 def get_trio_cooccurrence(
     db: Database, group_id: str, top_n: int = 5, never_top_n: int = 100
 ) -> Dict[str, List[Dict]]:

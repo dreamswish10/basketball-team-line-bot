@@ -119,6 +119,17 @@ def create_indexes():
         )
         db.opinions.create_index([("date", DESCENDING)], name="date_desc")
 
+        # AI 助理（/ai）：短期對話與長期筆記
+        logger.info("Creating indexes for AI assistant collections...")
+        db.ai_conversations.create_index(
+            [("scope_id", ASCENDING), ("created_at", DESCENDING)],
+            name="scope_created",
+        )
+        db.ai_memories.create_index(
+            [("scope_id", ASCENDING), ("created_at", ASCENDING)],
+            name="scope_created",
+        )
+
         # AliasMap collection indexes
         logger.info("Creating indexes for 'aliasMap' collection...")
         db.aliasMap.create_index([("userId", ASCENDING)], unique=True, name="userId_unique")
